@@ -1,0 +1,18 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+  - name: build
+    image: rust:latest
+    commands:
+      - cargo build --all
+  - name: lint
+    image: rust:latest
+    commands:
+      - rustup component add clippy
+      - cargo clippy --all
+  - name: test
+    image: rust:latest
+    commands:
+      - cargo test --all
