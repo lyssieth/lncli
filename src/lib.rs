@@ -1,5 +1,10 @@
 #![warn(clippy::pedantic)]
 
+use color_eyre::Report;
+
+pub type Res<T> = Result<T, Report>;
+
+#[must_use]
 pub fn do_stuff() -> bool {
     println!("Doing...");
     true
