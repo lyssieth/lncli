@@ -12,14 +12,16 @@ use crossterm::{
 };
 use tokio::time::sleep;
 use tui::{
-    backend::CrosstermBackend,
+    backend::{Backend, CrosstermBackend},
+    layout::{Constraint, Layout},
     widgets::{Block, Borders},
-    Terminal,
+    Frame, Terminal,
 };
 
-use lncli::Res;
+use lncli::{App, Res};
 struct State {
     pub terminal: Terminal<CrosstermBackend<Stdout>>,
+    pub app: App,
 }
 
 impl State {
@@ -31,7 +33,18 @@ impl State {
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
 
-        Ok(Self { terminal })
+        Ok(Self {
+            terminal,
+            app: App::new(),
+        })
+    }
+
+    pub fn draw<B: Backend>(&self, f: &mut Frame<B>) {
+        let chunks = Layout::default()
+            .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
+            .split(f.size());
+
+        let title = self.app.get_title();
     }
 }
 
