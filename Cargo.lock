@@ -623,6 +623,7 @@ dependencies = [
  "color-eyre",
  "cursive",
  "lipsum",
+ "owo-colors",
  "reqwest",
  "tokio",
  "url",
