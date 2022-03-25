@@ -2,61 +2,38 @@
 
 use std::{
     io::{self, Stdout},
+    path::PathBuf,
     time::Duration,
 };
 
-use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use tokio::time::sleep;
-use tui::{
-    backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Layout},
-    widgets::{Block, Borders},
-    Frame, Terminal,
-};
+use color_eyre::{eyre::bail, Report};
+use cursive::{views::TextView, Cursive, CursiveExt, CursiveRunnable};
 
-use lncli::{App, Res};
+type Res<T> = Result<T, Report>;
+
+mod scrape;
+
 struct State {
-    pub terminal: Terminal<CrosstermBackend<Stdout>>,
-    pub app: App,
+    cursive: CursiveRunnable,
 }
 
 impl State {
-    pub fn new(mut stdout: Stdout) -> Res<Self> {
-        enable_raw_mode()?;
+    pub fn new() -> Self {
+        let cursive = cursive::crossterm();
 
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-
-        let backend = CrosstermBackend::new(stdout);
-        let terminal = Terminal::new(backend)?;
-
-        Ok(Self {
-            terminal,
-            app: App::new(),
-        })
+        Self { cursive }
     }
 
-    pub fn draw<B: Backend>(&self, f: &mut Frame<B>) {
-        let chunks = Layout::default()
-            .constraints([Constraint::Min(0), Constraint::Length(1)].as_ref())
-            .split(f.size());
+    pub async fn run(&mut self) -> Res<()> {
+        let siv = &mut self.cursive;
 
-        let title = self.app.get_title();
-    }
-}
+        siv.add_layer(TextView::new("Hello, world!"));
 
-impl Drop for State {
-    fn drop(&mut self) {
-        execute!(
-            self.terminal.backend_mut(),
-            LeaveAlternateScreen,
-            DisableMouseCapture
-        )
-        .unwrap();
-        disable_raw_mode().unwrap();
+        siv.add_global_callback('q', Cursive::quit);
+
+        siv.run_crossterm()?;
+
+        Ok(())
     }
 }
 
@@ -64,15 +41,19 @@ impl Drop for State {
 async fn main() -> Res<()> {
     color_eyre::install()?;
 
-    let mut state = State::new(io::stdout())?;
+    let mut state = State::new();
 
-    state.terminal.draw(|f| {
-        let size = f.size();
-        let block = Block::default().title("Block").borders(Borders::all());
-        f.render_widget(block, size);
-    })?;
+    let path: PathBuf = "theme.toml".into();
 
-    sleep(Duration::from_millis(5000)).await;
+    if path.exists() {
+        let res = state.cursive.load_theme_file(path);
+
+        if let Err(err) = res {
+            bail!("{:?}", err);
+        }
+    }
+
+    state.run().await?;
 
     Ok(())
 }
