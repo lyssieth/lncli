@@ -6,9 +6,9 @@ use color_eyre::Report;
 use cursive::{
     align::{Align, HAlign},
     theme::{BaseColor, BorderStyle, Color, Palette, PaletteColor, Theme},
-    traits::{Resizable, Scrollable},
+    traits::{Nameable, Resizable, Scrollable},
     view::Margins,
-    views::{LinearLayout, PaddedView, TextView, ThemedView},
+    views::{LinearLayout, OnEventView, PaddedView, TextView, ThemedView},
     Cursive, CursiveExt, CursiveRunnable,
 };
 use owo_colors::OwoColorize;
@@ -32,7 +32,7 @@ impl State {
         let siv = &mut self.cursive;
         {
             let theme = get_theme();
-            siv.set_theme(dbg!(theme));
+            siv.set_theme(theme);
         }
 
         let size = siv.screen_size();
@@ -50,11 +50,12 @@ impl State {
 
         let layout = LinearLayout::vertical()
             .child(
-                TextView::new("Title and Shit Like qThat")
+                TextView::new("Title and Shit Like That")
                     .center()
-                    .fixed_height(2),
+                    .fixed_height(2)
+                    .with_name("title"),
             )
-            .child(PaddedView::new(margins, main_content.scrollable()))
+            .child(PaddedView::new(margins, main_content.scrollable()).with_name("main_content"))
             .child(
                 TextView::new(format!(
                     "press {q} to quit, {s} to search, and {arrow_keys} to navigate",
@@ -62,12 +63,16 @@ impl State {
                     s = "s".yellow(),
                     arrow_keys = "arrow keys".yellow()
                 ))
-                .align(Align::bot_right()),
+                .align(Align::bot_right())
+                .with_name("footer"),
             );
+
+        let layout = OnEventView::new(layout);
 
         siv.add_fullscreen_layer(layout);
 
         siv.add_global_callback('q', Cursive::quit);
+        siv.add_global_callback('d', Cursive::toggle_debug_console);
 
         siv.run_crossterm()?;
 
