@@ -5,10 +5,12 @@ use std::path::PathBuf;
 use color_eyre::Report;
 use cursive::{
     align::{Align, HAlign},
+    event::Key,
     theme::{BaseColor, BorderStyle, Color, Palette, PaletteColor, Theme},
     traits::{Nameable, Resizable, Scrollable},
+    utils::markup::markdown::parse,
     view::Margins,
-    views::{LinearLayout, OnEventView, PaddedView, TextView, ThemedView},
+    views::{LinearLayout, OnEventView, PaddedView, Panel, TextView, ThemedView},
     Cursive, CursiveExt, CursiveRunnable,
 };
 use owo_colors::OwoColorize;
@@ -73,10 +75,31 @@ impl State {
 
         siv.add_global_callback('q', Cursive::quit);
         siv.add_global_callback('d', Cursive::toggle_debug_console);
+        siv.add_global_callback('s', Self::search_view);
 
         siv.run_crossterm()?;
 
         Ok(())
+    }
+
+    fn search_view(siv: &mut Cursive) {
+        let markdown = parse("Hello, world!\n\nI am a *wonderful* **bean**!");
+
+        let inner = TextView::new(markdown).center();
+
+        let view = OnEventView::new(inner)
+            .on_event(Key::Esc, |s| {
+                s.pop_layer();
+            })
+            .on_event('s', |s| {
+                s.pop_layer();
+            });
+
+        let panel = Panel::new(view)
+            .title("Search")
+            .title_position(HAlign::Left);
+
+        siv.add_layer(panel);
     }
 }
 
