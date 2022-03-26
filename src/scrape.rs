@@ -6,7 +6,7 @@ use url::Url;
 use crate::Res;
 
 pub fn search(input: &str) -> Res<Search> {
-    todo!("implement searching")
+    bail!("searching is not implemented yet lmfao, nerd")
 }
 
 #[derive(Debug)]
