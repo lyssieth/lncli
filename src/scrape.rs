@@ -49,7 +49,7 @@ pub fn load(url: &str) -> Res<Output> {
     info!("Found chapter: {}", chapter.yellow());
     info!("Found max chapters: {}", max_chapters.yellow());
 
-    let (title, content) = {
+    let (name, chapter_title, content) = {
         let res = agent.get(url).call()?;
 
         if res.status() != 200 {
@@ -63,11 +63,11 @@ pub fn load(url: &str) -> Res<Output> {
         let html = res.into_string()?;
         let dom = Vis::load(html).map_err(|e| eyre!("{}", e.green()))?;
 
-        let title = dom
+        let name = dom
             .find("#main1 > div > div > div.top > h1 > a")
             .text()
             .to_owned();
-        info!("Found title: {}", title.green());
+        info!("Found title: {}", name.green());
         let chapter_title = {
             let el = dom.find("#main1 > div > div > div.top > span");
             let chapter_title = el.text().to_owned();
@@ -92,20 +92,22 @@ pub fn load(url: &str) -> Res<Output> {
             content
         };
 
-        (format!("{} - {}", title, chapter_title), content)
+        (name, chapter_title, content)
     };
 
     Ok(Output {
-        title,
+        name,
+        chapter_title,
         content,
         chapter,
         max_chapters,
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Output {
-    pub title: String,
+    pub name: String,
+    pub chapter_title: String,
     pub content: String,
     pub chapter: usize,
     pub max_chapters: usize,

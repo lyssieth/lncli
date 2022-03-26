@@ -15,7 +15,12 @@ use cursive::{
 use log::{error, info, LevelFilter};
 use owo_colors::OwoColorize;
 
-use crate::{state::State, Res};
+use crate::{
+    data::{Data, LN},
+    scrape,
+    state::State,
+    Res,
+};
 
 fn get_theme() -> Theme {
     let path: PathBuf = "theme.toml".into();
@@ -263,13 +268,49 @@ fn load_url(siv: &mut Cursive, url: &str, should_pop: bool) {
         siv.pop_layer();
     }
     info!("LOAD_URL: Attempting to load: {}", url.green());
-    let state = State::from_url(url);
+    let output = scrape::load(url);
+
+    if let Err(e) = output {
+        error_panel(siv, &format!("{}", e.to_string().red()));
+        return;
+    }
+
+    let output = output.unwrap();
+
+    let state = State::from_output(url, output.clone());
 
     if let Ok(state) = state {
         info!(
             "LOAD_URL: Successfully loaded state from url {}",
             &state.url
         );
+
+        let data = Data::load();
+
+        let mut data = if let Err(e) = data {
+            if e.to_string().starts_with("data file does not exist") {
+                Data::new()
+            } else {
+                error!("{}", e);
+                return;
+            }
+        } else {
+            data.unwrap()
+        };
+
+        data.recent_mut().push(LN {
+            name: output.name.clone(),
+            url: url.to_owned(),
+            last_chapter: output.chapter,
+        });
+
+        let save_res = data.save();
+
+        if let Err(e) = save_res {
+            error!("{}", e);
+            return;
+        }
+
         siv.set_user_data(state);
     } else {
         error!("LOAD_URL: {}", state.unwrap_err());

@@ -1,7 +1,4 @@
-use crate::{
-    scrape::{self, Output},
-    Res,
-};
+use crate::{scrape::Output, Res};
 
 #[derive(Debug, Clone)]
 pub struct State {
@@ -13,16 +10,17 @@ pub struct State {
 }
 
 impl State {
-    pub fn from_url(url: &str) -> Res<Self> {
+    pub fn from_output(url: &str, output: Output) -> Res<Self> {
         let Output {
-            title,
+            chapter_title,
             content,
             chapter,
             max_chapters,
-        } = scrape::load(url)?;
+            ..
+        } = output;
         Ok(Self {
             url: url.to_owned(),
-            title,
+            title: chapter_title,
             chapter,
             max_chapters,
             content,

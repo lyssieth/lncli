@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::Res;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct LN {
-    name: String,
-    url: String,
-    last_chapter: usize,
+pub struct LN {
+    pub name: String,
+    pub url: String,
+    pub last_chapter: usize,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -48,11 +48,19 @@ impl Data {
 
         std::fs::create_dir_all(path.parent().unwrap())?;
 
-        let data = serde_json::to_string_pretty(self)?;
+        let mut data = self.clone();
+
+        data.prune();
+
+        let data = serde_json::to_string_pretty(&data)?;
 
         std::fs::write(&path, data)?;
 
         Ok(())
+    }
+
+    fn prune(&mut self) {
+        self.recent_novels = Vec::from(&self.recent_novels[0..=10]);
     }
 
     /// get tracked novels
@@ -60,8 +68,18 @@ impl Data {
         &self.tracked_novels
     }
 
+    /// get tracked novels but mutable
+    pub fn tracked_mut(&mut self) -> &mut Vec<LN> {
+        &mut self.tracked_novels
+    }
+
     /// get recent novels
     pub fn recent(&self) -> &Vec<LN> {
         &self.recent_novels
+    }
+
+    /// get recent novels but mutable
+    pub fn recent_mut(&mut self) -> &mut Vec<LN> {
+        &mut self.recent_novels
     }
 }
