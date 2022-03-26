@@ -74,7 +74,7 @@ impl App {
         Self { cursive }
     }
 
-    pub async fn run(&mut self) -> Res<()> {
+    pub fn run(&mut self) -> Res<()> {
         let siv = &mut self.cursive;
         {
             let theme = get_theme();
@@ -203,13 +203,12 @@ impl App {
     }
 }
 
-#[tokio::main]
-async fn main() -> Res<()> {
+fn main() -> Res<()> {
     color_eyre::install()?;
 
     let mut state = App::new();
 
-    state.run().await?;
+    state.run()?;
 
     Ok(())
 }
