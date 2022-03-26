@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use cursive::{
     align::{Align, HAlign},
+    direction::Orientation,
     event::Key,
     theme::{BaseColor, BorderStyle, Color, Palette, PaletteColor, Theme},
     traits::{Nameable, Resizable, Scrollable},
-    utils::markup::markdown::parse,
     view::Margins,
     views::{
         DummyView, EditView, LinearLayout, OnEventView, PaddedView, Panel, TextView, ThemedView,
@@ -319,11 +319,13 @@ fn load_url(siv: &mut Cursive, url: &str, should_pop: bool) {
 
 fn search_view(siv: &mut Cursive) {
     info!("search view");
-    let markdown = parse("Hello, world!\n\nI am a *wonderful* **bean**!");
+    let layout = LinearLayout::new(Orientation::Vertical);
 
-    let inner = TextView::new(markdown).center();
+    let panel = Panel::new(layout)
+        .title("Search")
+        .title_position(HAlign::Left);
 
-    let view = OnEventView::new(inner)
+    let view = OnEventView::new(panel)
         .on_event(Key::Esc, |s| {
             s.pop_layer();
         })
@@ -331,9 +333,5 @@ fn search_view(siv: &mut Cursive) {
             s.pop_layer();
         });
 
-    let panel = Panel::new(view)
-        .title("Search")
-        .title_position(HAlign::Left);
-
-    siv.add_layer(panel);
+    siv.add_layer(view);
 }
