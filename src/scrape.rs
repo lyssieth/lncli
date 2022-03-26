@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use color_eyre::eyre::bail;
 use url::Url;
 
 use crate::Res;
@@ -14,11 +15,13 @@ pub struct Search {
 }
 
 pub fn load(url: &str) -> Res<Output> {
-    todo!("implement loading")
+    bail!("loading is not implemented yet lmfao, nerd");
 }
 
 #[derive(Debug)]
 pub struct Output {
     pub title: String,
     pub content: String,
+    pub chapter: usize,
+    pub max_chapters: usize,
 }
