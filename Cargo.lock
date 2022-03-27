@@ -458,6 +458,7 @@ dependencies = [
  "lipsum",
  "log",
  "owo-colors",
+ "regex",
  "serde",
  "serde_json",
  "ureq",

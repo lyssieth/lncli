@@ -17,7 +17,7 @@ use owo_colors::OwoColorize;
 
 use crate::{
     data::{Data, LN},
-    scrape,
+    scrape::{self, Search},
     state::State,
     Res,
 };
@@ -57,7 +57,7 @@ pub fn run() -> Res<()> {
 
     siv.add_global_callback('q', Cursive::quit);
     siv.add_global_callback('D', Cursive::toggle_debug_console);
-    siv.add_global_callback('s', search_view);
+    siv.add_global_callback('s', |siv| search_view(siv, None));
 
     home_view(siv);
 
@@ -66,7 +66,6 @@ pub fn run() -> Res<()> {
         load_url(
             siv,
             "https://freewebnovel.com/prime-originator/chapter-69.html",
-            false,
         );
     }
 
@@ -77,11 +76,11 @@ pub fn run() -> Res<()> {
 
 fn reader_view(siv: &mut Cursive) {
     info!("reader view");
-    siv.pop_layer();
 
     let state = siv.take_user_data();
 
     if state.is_none() {
+        siv.pop_layer();
         home_view(siv);
         return;
     }
@@ -105,7 +104,7 @@ fn reader_view(siv: &mut Cursive) {
         .child(
             TextView::new(format!(
                 "{} - Chapter {}/{}",
-                state.title.green(),
+                (&state.title).green(),
                 state.chapter.yellow(),
                 state.max_chapters.yellow()
             ))
@@ -141,6 +140,7 @@ fn reader_view(siv: &mut Cursive) {
             previous_chapter(siv, &state.clone());
         });
 
+    siv.pop_layer();
     siv.add_fullscreen_layer(layout);
 
     siv.clear_global_callbacks('r');
@@ -156,10 +156,10 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
         .content(state.chapter.to_string())
         .max_content_width(5)
         .on_submit(move |s, text| {
-            s.pop_layer();
             let text = text.trim();
 
             if text.is_empty() {
+                s.pop_layer();
                 error_panel(s, "please enter a chapter number");
                 return;
             }
@@ -167,6 +167,7 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
             let chapter = text.parse::<usize>();
 
             if chapter.is_err() {
+                s.pop_layer();
                 error_panel(
                     s,
                     &format!(
@@ -180,6 +181,7 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
             let chapter = chapter.unwrap();
 
             if !range.contains(&chapter) {
+                s.pop_layer();
                 error_panel(s, "please enter a number inside the range");
                 return;
             }
@@ -190,9 +192,9 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
                     "https://freewebnovel.com/prime-originator/chapter-{}.html",
                     chapter
                 ),
-                false,
             );
 
+            s.pop_layer();
             reader_view(s);
         });
 
@@ -210,12 +212,11 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
 }
 
 fn error_panel(siv: &mut Cursive, err: &str) {
-    siv.pop_layer();
     info!("error panel");
 
     let layout = LinearLayout::vertical()
         .child(TextView::new(err).center())
-        .child(TextView::new("Press esc to pop layer").center());
+        .child(TextView::new(format!("Press {esc} to close", esc = "esc".yellow())).center());
 
     let panel = Panel::new(layout).title("Error");
     let panel = OnEventView::new(panel).on_event(Key::Esc, |s| {
@@ -233,40 +234,38 @@ fn previous_chapter(siv: &mut Cursive, state: &State) {
         &format!("chapter-{}", state.chapter - 1),
     );
 
-    load_url(siv, &url, false);
+    load_url(siv, &url);
 
+    siv.pop_layer();
     reader_view(siv);
 }
 
 fn next_chapter(siv: &mut Cursive, state: &State) {
     info!("next chapter");
-    siv.pop_layer();
 
     let url = state.url.replace(
         &format!("chapter-{}", state.chapter),
         &format!("chapter-{}", state.chapter + 1),
     );
 
-    load_url(siv, &url, false);
+    load_url(siv, &url);
 
+    siv.pop_layer();
     reader_view(siv);
 }
 
 fn home_view(siv: &mut Cursive) {
     info!("home view");
-    siv.pop_layer();
 
     siv.clear_global_callbacks('h');
 
+    siv.pop_layer();
     siv.add_fullscreen_layer(DummyView); // TODO: Write the home view
 
     siv.add_global_callback('r', reader_view);
 }
 
-fn load_url(siv: &mut Cursive, url: &str, should_pop: bool) {
-    if should_pop {
-        siv.pop_layer();
-    }
+fn load_url(siv: &mut Cursive, url: &str) {
     info!("LOAD_URL: Attempting to load: {}", url.green());
     let output = scrape::load(url);
 
@@ -313,15 +312,31 @@ fn load_url(siv: &mut Cursive, url: &str, should_pop: bool) {
     siv.set_user_data(state);
 }
 
-fn search_view(siv: &mut Cursive) {
+fn search_view(siv: &mut Cursive, results: Option<Search>) {
     info!("search view");
-    let layout = LinearLayout::new(Orientation::Vertical);
 
-    let panel = Panel::new(layout)
-        .title("Search")
-        .title_position(HAlign::Left);
+    let search_box = {
+        let ev = EditView::new().on_submit(move |s, text| {
+            let text = text.trim();
 
-    let view = OnEventView::new(panel)
+            if text.is_empty() {
+                error_panel(s, "please enter a search term");
+                return;
+            }
+
+            search_url(s, text);
+        });
+
+        if let Some(results) = results {
+            ev.content(&results.query)
+        } else {
+            ev
+        }
+    };
+
+    let layout = LinearLayout::new(Orientation::Vertical).child(search_box);
+
+    let view = OnEventView::new(layout)
         .on_event(Key::Esc, |s| {
             s.pop_layer();
         })
@@ -330,4 +345,20 @@ fn search_view(siv: &mut Cursive) {
         });
 
     siv.add_layer(view);
+}
+
+fn search_url(siv: &mut Cursive, query: &str) {
+    info!("search query: {}", query.green());
+
+    let output = scrape::search(query);
+
+    siv.pop_layer();
+    if let Err(e) = &output {
+        search_view(siv, None);
+        error_panel(siv, &format!("{}", e.to_string().red()));
+    }
+
+    let output = output.unwrap();
+
+    search_view(siv, Some(output));
 }

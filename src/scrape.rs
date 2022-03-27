@@ -3,6 +3,7 @@
 use color_eyre::eyre::{bail, eyre};
 use log::info;
 use owo_colors::OwoColorize;
+use regex::Regex;
 use ureq::Agent;
 use url::Url;
 use visdom::Vis;
@@ -15,10 +16,13 @@ pub fn search(input: &str) -> Res<Search> {
 
 #[derive(Debug)]
 pub struct Search {
+    pub query: String,
     pub results: Vec<(Url, String)>,
 }
 
 pub fn load(url: &str) -> Res<Output> {
+    let chapter_regex = Regex::new(r"[Cc]hapter (\d+).*").unwrap();
+
     let agent = Agent::new();
 
     let (main_url, chapter) = {
@@ -36,12 +40,28 @@ pub fn load(url: &str) -> Res<Output> {
     let max_chapters = {
         let res = agent.get(&main_url).call()?;
 
+        if res.status() != 200 {
+            bail!(
+                "got status code {}: {}",
+                res.status().yellow(),
+                res.status_text().green()
+            );
+        }
+
         let dom = Vis::load(res.into_string()?).map_err(|e| eyre!("{}", e.green()))?;
 
         let item = dom.find("body > div.main > div > div > div.col-content > div.m-newest1 > ul > li:nth-child(1) > a").text().to_owned();
 
-        let max_chapters = item.split_once('-').unwrap().0;
-        let max_chapters = max_chapters.split_once(' ').unwrap().1;
+        dbg!(&item);
+
+        let max_chapters = chapter_regex
+            .captures(&item)
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .as_str();
+
+        dbg!(max_chapters);
 
         max_chapters.trim().parse::<usize>()?
     };
