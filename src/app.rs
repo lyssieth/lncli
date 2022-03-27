@@ -1,5 +1,11 @@
 use std::path::PathBuf;
 
+use crate::{
+    data::{Data, LN},
+    scrape::{self, Search},
+    state::State,
+    Res,
+};
 use cursive::{
     align::{Align, HAlign},
     direction::Orientation,
@@ -8,19 +14,13 @@ use cursive::{
     traits::{Nameable, Resizable, Scrollable},
     view::Margins,
     views::{
-        DummyView, EditView, LinearLayout, OnEventView, PaddedView, Panel, TextView, ThemedView,
+        DummyView, EditView, LinearLayout, OnEventView, PaddedView, Panel, SelectView, TextView,
+        ThemedView,
     },
     Cursive, CursiveExt,
 };
-use log::{error, info, LevelFilter};
+use log::{info, LevelFilter};
 use owo_colors::OwoColorize;
-
-use crate::{
-    data::{Data, LN},
-    scrape::{self, Search},
-    state::State,
-    Res,
-};
 
 fn get_theme() -> Theme {
     let path: PathBuf = "theme.toml".into();
@@ -55,19 +55,13 @@ pub fn run() -> Res<()> {
         siv.set_theme(theme);
     }
 
+    siv.add_active_screen();
+
     siv.add_global_callback('q', Cursive::quit);
     siv.add_global_callback('D', Cursive::toggle_debug_console);
     siv.add_global_callback('s', |siv| search_view(siv, None));
 
     home_view(siv);
-
-    {
-        // TODO: REMOVE THIS DEBUG LOAD AND LOAD PROPERLY YA DAFT CUNT
-        load_url(
-            siv,
-            "https://freewebnovel.com/prime-originator/chapter-69.html",
-        );
-    }
 
     siv.run_crossterm()?;
 
@@ -152,6 +146,7 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
 
     let range = 1..=state.max_chapters;
 
+    let state = state.clone();
     let chapter_select = EditView::new()
         .content(state.chapter.to_string())
         .max_content_width(5)
@@ -186,13 +181,12 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
                 return;
             }
 
-            load_url(
-                s,
-                &format!(
-                    "https://freewebnovel.com/prime-originator/chapter-{}.html",
-                    chapter
-                ),
-            );
+            let pat = format!("chapter-{}", state.chapter);
+            let url = state
+                .url
+                .replace(pat.as_str(), &format!("chapter-{}", chapter));
+
+            load_url(s, &url);
 
             s.pop_layer();
             reader_view(s);
@@ -271,7 +265,7 @@ fn load_url(siv: &mut Cursive, url: &str) {
 
     if let Err(e) = output {
         error_panel(siv, &format!("{}", e.to_string().red()));
-        return;
+        panic!("{}", e);
     }
 
     let output = output.unwrap();
@@ -280,7 +274,7 @@ fn load_url(siv: &mut Cursive, url: &str) {
 
     info!(
         "LOAD_URL: Successfully loaded state from url {}",
-        &state.url
+        &state.url,
     );
 
     let data = Data::load();
@@ -289,8 +283,7 @@ fn load_url(siv: &mut Cursive, url: &str) {
         if e.to_string().starts_with("data file does not exist") {
             Data::new()
         } else {
-            error!("{}", e);
-            return;
+            panic!("{}", e);
         }
     } else {
         data.unwrap()
@@ -305,16 +298,13 @@ fn load_url(siv: &mut Cursive, url: &str) {
     let save_res = data.save();
 
     if let Err(e) = save_res {
-        error!("{}", e);
-        return;
+        panic!("{}", e);
     }
 
     siv.set_user_data(state);
 }
 
 fn search_view(siv: &mut Cursive, results: Option<Search>) {
-    info!("search view");
-
     let search_box = {
         let ev = EditView::new().on_submit(move |s, text| {
             let text = text.trim();
@@ -327,14 +317,71 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
             search_url(s, text);
         });
 
-        if let Some(results) = results {
+        if let Some(results) = &results {
             ev.content(&results.query)
         } else {
             ev
         }
     };
 
-    let layout = LinearLayout::new(Orientation::Vertical).child(search_box);
+    let search_results = {
+        if let Some(search) = &results {
+            let mut sv = SelectView::new().h_align(HAlign::Center);
+
+            if search.results.is_empty() {
+                sv.set_on_submit(|s, _| {
+                    s.pop_layer();
+                    error_panel(s, "No results found.\nTry a shorter query.");
+                });
+                return;
+            }
+
+            for (url, label) in search.results.clone() {
+                sv.add_item(label, url);
+            }
+
+            sv.set_on_submit(|s, url| {
+                let url = url.as_str();
+
+                let url = url.replace(".html", "/chapter-1.html");
+
+                load_url(s, &url);
+                s.pop_layer();
+                reader_view(s);
+            });
+
+            Some(sv)
+        } else {
+            None
+        }
+    };
+
+    let search_layout = {
+        let mut layout = LinearLayout::vertical();
+
+        if let Some(search_results) = search_results {
+            layout.add_child(TextView::new(format!(
+                "Your search was: {}",
+                results.unwrap().query
+            )));
+            layout.add_child(search_results);
+        } else {
+            layout.add_child(search_box);
+        }
+
+        layout
+    };
+
+    let controls = TextView::new(format!(
+        "{esc} to go back, {enter} to search",
+        esc = "esc".yellow(),
+        enter = "Enter".yellow()
+    ))
+    .align(Align::bot_right());
+
+    let layout = LinearLayout::new(Orientation::Vertical)
+        .child(search_layout)
+        .child(controls);
 
     let view = OnEventView::new(layout)
         .on_event(Key::Esc, |s| {

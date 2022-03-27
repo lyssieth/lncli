@@ -10,8 +10,41 @@ use visdom::Vis;
 
 use crate::Res;
 
+const SEARCH_URL: &str = "https://freewebnovel.com/search/";
+
 pub fn search(input: &str) -> Res<Search> {
-    bail!("searching is not implemented yet lmfao, nerd")
+    let agent = Agent::new();
+
+    let res = agent.post(SEARCH_URL).send_form(&[("searchkey", input)])?;
+
+    if res.status() != 200 {
+        bail!(
+            "got status code {}: {}",
+            res.status().yellow(),
+            res.status_text().green()
+        );
+    }
+
+    let dom = Vis::load(res.into_string()?).map_err(|e| eyre!("{}", e.green()))?;
+
+    let elements = dom.find("div.li-row");
+
+    let mut results = Vec::new();
+
+    for el in elements {
+        let children = el.children();
+        let title = children.find("h3.tit").first();
+        let title = title.text();
+        let url = children.find("h3.tit > a").first().attr("href").unwrap();
+        let url = format!("https://freewebnovel.com{}", url.to_string());
+
+        results.push((Url::parse(&url).unwrap(), title.to_owned()));
+    }
+
+    Ok(Search {
+        query: input.to_owned(),
+        results,
+    })
 }
 
 #[derive(Debug)]
@@ -21,7 +54,11 @@ pub struct Search {
 }
 
 pub fn load(url: &str) -> Res<Output> {
-    let chapter_regex = Regex::new(r"[Cc]hapter (\d+).*").unwrap();
+    if !url.contains("/chapter-") {
+        bail!("invalid url: {}", url.green());
+    }
+
+    let chapter_regex = Regex::new(r"chapter-(\d+)\.html").unwrap();
 
     let agent = Agent::new();
 
@@ -50,18 +87,15 @@ pub fn load(url: &str) -> Res<Output> {
 
         let dom = Vis::load(res.into_string()?).map_err(|e| eyre!("{}", e.green()))?;
 
-        let item = dom.find("body > div.main > div > div > div.col-content > div.m-newest1 > ul > li:nth-child(1) > a").text().to_owned();
+        let item = dom.find("body > div.main > div > div > div.col-content > div.m-newest1 > ul > li:nth-child(1) > a").attr("href").unwrap().to_string();
 
-        dbg!(&item);
+        let max_chapters = chapter_regex.captures(&item);
 
-        let max_chapters = chapter_regex
-            .captures(&item)
-            .unwrap()
-            .get(1)
-            .unwrap()
-            .as_str();
-
-        dbg!(max_chapters);
+        let max_chapters = if let Some(max_chapters) = max_chapters {
+            max_chapters.get(1).unwrap().as_str()
+        } else {
+            bail!("could not find max chapters, regex failed");
+        };
 
         max_chapters.trim().parse::<usize>()?
     };
@@ -92,7 +126,11 @@ pub fn load(url: &str) -> Res<Output> {
             let el = dom.find("#main1 > div > div > div.top > span");
             let chapter_title = el.text().to_owned();
 
-            chapter_title.split_once('-').unwrap().1.trim().to_owned()
+            if let Some(split) = chapter_title.split_once('-') {
+                split.1.trim().to_owned()
+            } else {
+                chapter_title
+            }
         };
         info!("Found chapter title: {}", chapter_title.green());
 
