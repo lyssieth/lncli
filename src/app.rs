@@ -85,6 +85,10 @@ fn reader_view(siv: &mut Cursive) {
     }
 
     let state: State = state.unwrap();
+    {
+        let state = state.clone();
+        siv.set_user_data(state);
+    }
 
     let size = siv.screen_size();
 
