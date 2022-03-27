@@ -19,7 +19,7 @@ pub fn search(input: &str) -> Res<Search> {
 
     if res.status() != 200 {
         bail!(
-            "got status code {}: {}",
+            "got status code {}: {}", // TODO: Nicer error messages
             res.status().yellow(),
             res.status_text().green()
         );
@@ -38,7 +38,7 @@ pub fn search(input: &str) -> Res<Search> {
         let url = children.find("h3.tit > a").first().attr("href");
 
         if url.is_none() {
-            bail!("found no results");
+            bail!("found no results"); // TODO: Nicer error messages
         }
 
         let url = url.unwrap();
@@ -62,7 +62,7 @@ pub struct Search {
 
 pub fn load(url: &str) -> Res<Output> {
     if !url.contains("/chapter-") {
-        bail!("invalid url: {}", url.green());
+        bail!("invalid url: {}", url.green()); // TODO: Nicer error messages
     }
 
     let chapter_regex = Regex::new(r"chapter-(\d+)\.html").unwrap();
@@ -86,7 +86,7 @@ pub fn load(url: &str) -> Res<Output> {
 
         if res.status() != 200 {
             bail!(
-                "got status code {}: {}",
+                "got status code {}: {}", // TODO: Nicer error messages
                 res.status().yellow(),
                 res.status_text().green()
             );
@@ -101,7 +101,7 @@ pub fn load(url: &str) -> Res<Output> {
         let max_chapters = if let Some(max_chapters) = max_chapters {
             max_chapters.get(1).unwrap().as_str()
         } else {
-            bail!("could not find max chapters, regex failed");
+            bail!("could not find max chapters, regex failed"); // TODO: Nicer error messages
         };
 
         max_chapters.trim().parse::<usize>()?
@@ -115,7 +115,7 @@ pub fn load(url: &str) -> Res<Output> {
 
         if res.status() != 200 {
             bail!(
-                "got status code {}: {}",
+                "got status code {}: {}", // TODO: Nicer error messages
                 res.status().yellow(),
                 res.status_text().green()
             );

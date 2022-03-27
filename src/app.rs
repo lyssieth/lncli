@@ -6,7 +6,6 @@ use crate::{
     state::State,
     Res,
 };
-use cursive::views::FixedLayout;
 use cursive::{
     align::{Align, HAlign},
     direction::Orientation,
@@ -118,8 +117,8 @@ fn reader_view(siv: &mut Cursive) {
         .child(PaddedView::new(margins, main_content.scrollable()).with_name("main_content"))
         .child(
             TextView::new(format!(
-                "{q}uit, {C}haper select, {h}ome view, {s}earch, and {arrow_keys}",
-                C = "C".yellow(),
+                "{q}uit, {c}hapter select, {h}ome view, {s}earch, and {arrow_keys}",
+                c = "c".yellow(),
                 q = "q".yellow(),
                 h = "h".yellow(),
                 s = "s".yellow(),
@@ -133,7 +132,7 @@ fn reader_view(siv: &mut Cursive) {
     let s2 = state.clone();
 
     let layout = OnEventView::new(layout)
-        .on_event('C', move |siv| {
+        .on_event('c', move |siv| {
             select_chapter(siv, &s1.clone());
         })
         .on_event(Key::Right, move |siv| {
@@ -164,7 +163,7 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
 
             if text.is_empty() {
                 s.pop_layer();
-                error_panel(s, "please enter a chapter number");
+                error_panel(s, "please enter a chapter number"); // TODO: Nicer error messages
                 return;
             }
 
@@ -175,7 +174,7 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
                 error_panel(
                     s,
                     &format!(
-                        "please enter a valid number ({})",
+                        "please enter a valid number ({})", // TODO: Nicer error messages
                         chapter.unwrap_err().to_string().red()
                     ),
                 );
@@ -186,7 +185,7 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
 
             if !range.contains(&chapter) {
                 s.pop_layer();
-                error_panel(s, "please enter a number inside the range");
+                error_panel(s, "please enter a number inside the range"); // TODO: Nicer error messages
                 return;
             }
 
