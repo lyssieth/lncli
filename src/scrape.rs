@@ -35,7 +35,14 @@ pub fn search(input: &str) -> Res<Search> {
         let children = el.children();
         let title = children.find("h3.tit").first();
         let title = title.text();
-        let url = children.find("h3.tit > a").first().attr("href").unwrap();
+        let url = children.find("h3.tit > a").first().attr("href");
+
+        if url.is_none() {
+            bail!("found no results");
+        }
+
+        let url = url.unwrap();
+
         let url = format!("https://freewebnovel.com{}", url.to_string());
 
         results.push((Url::parse(&url).unwrap(), title.to_owned()));

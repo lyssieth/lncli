@@ -77,7 +77,10 @@ fn reader_view(siv: &mut Cursive) {
     if state.is_none() {
         siv.pop_layer();
         home_view(siv);
-        error_panel(siv, "Nothing is configured to be read. Please use `s`, or select from the home screen.");
+        error_panel(
+            siv,
+            "Nothing is configured to be read. Please use `s`, or select from the home screen.",
+        );
         return;
     }
 
@@ -431,6 +434,7 @@ fn search_url(siv: &mut Cursive, query: &str) {
     if let Err(e) = &output {
         search_view(siv, None);
         error_panel(siv, &format!("{}", e.to_string().red()));
+        return;
     }
 
     let output = output.unwrap();
