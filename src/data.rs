@@ -60,7 +60,9 @@ impl Data {
     }
 
     fn prune(&mut self) {
-        self.recent_novels = Vec::from(&self.recent_novels[0..=10]);
+        if self.recent_novels.len() > 10 {
+            self.recent_novels = Vec::from(&self.recent_novels[0..=10]);
+        }
     }
 
     /// get tracked novels

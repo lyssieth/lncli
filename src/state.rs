@@ -1,4 +1,4 @@
-use crate::{scrape::Output, Res};
+use crate::scrape::Output;
 
 #[derive(Debug, Clone)]
 pub struct State {
@@ -10,7 +10,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn from_output(url: &str, output: Output) -> Res<Self> {
+    pub fn from_output(url: &str, output: Output) -> Self {
         let Output {
             chapter_title,
             content,
@@ -18,12 +18,12 @@ impl State {
             max_chapters,
             ..
         } = output;
-        Ok(Self {
+        Self {
             url: url.to_owned(),
             title: chapter_title,
             chapter,
             max_chapters,
             content,
-        })
+        }
     }
 }

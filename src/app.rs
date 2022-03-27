@@ -279,42 +279,38 @@ fn load_url(siv: &mut Cursive, url: &str, should_pop: bool) {
 
     let state = State::from_output(url, output.clone());
 
-    if let Ok(state) = state {
-        info!(
-            "LOAD_URL: Successfully loaded state from url {}",
-            &state.url
-        );
+    info!(
+        "LOAD_URL: Successfully loaded state from url {}",
+        &state.url
+    );
 
-        let data = Data::load();
+    let data = Data::load();
 
-        let mut data = if let Err(e) = data {
-            if e.to_string().starts_with("data file does not exist") {
-                Data::new()
-            } else {
-                error!("{}", e);
-                return;
-            }
+    let mut data = if let Err(e) = data {
+        if e.to_string().starts_with("data file does not exist") {
+            Data::new()
         } else {
-            data.unwrap()
-        };
-
-        data.recent_mut().push(LN {
-            name: output.name.clone(),
-            url: url.to_owned(),
-            last_chapter: output.chapter,
-        });
-
-        let save_res = data.save();
-
-        if let Err(e) = save_res {
             error!("{}", e);
             return;
         }
-
-        siv.set_user_data(state);
     } else {
-        error!("LOAD_URL: {}", state.unwrap_err());
+        data.unwrap()
+    };
+
+    data.recent_mut().push(LN {
+        name: output.name.clone(),
+        url: url.to_owned(),
+        last_chapter: output.chapter,
+    });
+
+    let save_res = data.save();
+
+    if let Err(e) = save_res {
+        error!("{}", e);
+        return;
     }
+
+    siv.set_user_data(state);
 }
 
 fn search_view(siv: &mut Cursive) {
