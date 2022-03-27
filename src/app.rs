@@ -6,6 +6,7 @@ use crate::{
     state::State,
     Res,
 };
+use cursive::views::FixedLayout;
 use cursive::{
     align::{Align, HAlign},
     direction::Orientation,
@@ -305,6 +306,7 @@ fn load_url(siv: &mut Cursive, url: &str) {
 }
 
 fn search_view(siv: &mut Cursive, results: Option<Search>) {
+    let results_mode = results.is_some();
     let search_box = {
         let ev = EditView::new().on_submit(move |s, text| {
             let text = text.trim();
@@ -360,10 +362,21 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
         let mut layout = LinearLayout::vertical();
 
         if let Some(search_results) = search_results {
-            layout.add_child(TextView::new(format!(
-                "Your search was: {}",
-                results.unwrap().query
-            )));
+            let query = results.unwrap().query;
+            let query = query.trim();
+            let query = "        ".to_owned() + query;
+
+            layout.add_child(
+                TextView::new(query.green().to_string())
+                    .h_align(HAlign::Center)
+                    .no_wrap(),
+            );
+            layout.add_child(
+                TextView::new("-".repeat(query.len()))
+                    .h_align(HAlign::Center)
+                    .no_wrap(),
+            );
+
             layout.add_child(search_results);
         } else {
             layout.add_child(search_box);
@@ -372,24 +385,38 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
         layout
     };
 
-    let controls = TextView::new(format!(
-        "{esc} to go back, {enter} to search",
-        esc = "esc".yellow(),
-        enter = "Enter".yellow()
-    ))
-    .align(Align::bot_right());
+    let results_mode_text = {
+        if results_mode {
+            format!(
+                "{esc} to go back, {enter} to select, {arrow_keys} to navigate",
+                esc = "esc".yellow(),
+                enter = "enter".yellow(),
+                arrow_keys = "arrow keys".yellow()
+            )
+        } else {
+            format!(
+                "{esc} to go back, {enter} to search",
+                esc = "esc".yellow(),
+                enter = "Enter".yellow()
+            )
+        }
+    };
+
+    let controls = TextView::new(results_mode_text).align(Align::bot_right());
 
     let layout = LinearLayout::new(Orientation::Vertical)
         .child(search_layout)
         .child(controls);
 
-    let view = OnEventView::new(layout)
-        .on_event(Key::Esc, |s| {
-            s.pop_layer();
-        })
-        .on_event('s', |s| {
-            s.pop_layer();
-        });
+    let panel = Panel::new(layout).title(if results_mode {
+        "Search Results"
+    } else {
+        "Search"
+    });
+
+    let view = OnEventView::new(panel).on_event(Key::Esc, |s| {
+        s.pop_layer();
+    });
 
     siv.add_layer(view);
 }
