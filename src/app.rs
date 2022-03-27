@@ -118,7 +118,7 @@ fn reader_view(siv: &mut Cursive) {
         .child(PaddedView::new(margins, main_content.scrollable()).with_name("main_content"))
         .child(
             TextView::new(format!(
-                "press {q} to quit, {C} to select chapter by number, {h} to go home, {s} to search, and {arrow_keys} to navigate",
+                "{q}uit, {C}haper select, {h}ome view, {s}earch, and {arrow_keys}",
                 C = "C".yellow(),
                 q = "q".yellow(),
                 h = "h".yellow(),
@@ -232,6 +232,11 @@ fn error_panel(siv: &mut Cursive, err: &str) {
 fn previous_chapter(siv: &mut Cursive, state: &State) {
     siv.pop_layer();
 
+    if state.chapter == 1 {
+        error_panel(siv, "You are already on the first chapter");
+        return;
+    }
+
     let url = state.url.replace(
         &format!("chapter-{}", state.chapter),
         &format!("chapter-{}", state.chapter - 1),
@@ -245,6 +250,11 @@ fn previous_chapter(siv: &mut Cursive, state: &State) {
 
 fn next_chapter(siv: &mut Cursive, state: &State) {
     info!("next chapter");
+
+    if state.chapter == state.max_chapters {
+        error_panel(siv, "You are already on the last chapter");
+        return;
+    }
 
     let url = state.url.replace(
         &format!("chapter-{}", state.chapter),
