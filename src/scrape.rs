@@ -60,6 +60,26 @@ pub struct Search {
     pub results: Vec<(Url, String)>,
 }
 
+pub(crate) fn get_name(url: &str) -> Res<String> {
+    let agent = Agent::new();
+
+    let res = agent.get(url).call()?;
+
+    if res.status() != 200 {
+        bail!(
+            "got status code {}: {}", // TODO: Nicer error messages
+            res.status().yellow(),
+            res.status_text().green()
+        );
+    }
+
+    let dom = Vis::load(res.into_string()?).map_err(|e| eyre!("{}", e.green()))?;
+
+    let title = dom.find("h1.tit").first();
+
+    Ok(title.text().to_owned())
+}
+
 pub fn load(url: &str) -> Res<Output> {
     if !url.contains("/chapter-") {
         bail!("invalid url: {}", url.green()); // TODO: Nicer error messages

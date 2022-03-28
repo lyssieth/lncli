@@ -1,6 +1,8 @@
 use color_eyre::eyre::bail;
 use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use std::path::PathBuf;
 
 use crate::Res;
 
@@ -14,21 +16,27 @@ pub struct LN {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Data {
     tracked_novels: Vec<LN>,
-    recent_novels: Vec<LN>,
+    recent_novels: VecDeque<LN>,
 }
 
 impl Data {
+    pub fn data_folder() -> PathBuf {
+        let config_dir = dirs::config_dir().expect("Could not find config directory");
+
+        config_dir.join("lncli/")
+    }
+
     /// makes a new data
     pub fn new() -> Self {
         Self {
             tracked_novels: Vec::new(),
-            recent_novels: Vec::new(),
+            recent_novels: VecDeque::new(),
         }
     }
 
     /// load data from file
     pub fn load() -> Res<Self> {
-        let path = dirs::config_dir().unwrap().join("lncli/data.json");
+        let path = Self::data_folder().join("data.json");
 
         if !path.exists() {
             bail!(
@@ -44,7 +52,7 @@ impl Data {
 
     /// save the data to the data file
     pub fn save(&self) -> Res<()> {
-        let path = dirs::config_dir().unwrap().join("lncli/data.json");
+        let path = Self::data_folder().join("data.json");
 
         std::fs::create_dir_all(path.parent().unwrap())?;
 
@@ -61,7 +69,12 @@ impl Data {
 
     fn prune(&mut self) {
         if self.recent_novels.len() > 10 {
-            self.recent_novels = Vec::from(&self.recent_novels[0..=10]);
+            self.recent_novels = self
+                .recent_novels
+                .clone()
+                .into_iter()
+                .take(10)
+                .collect::<VecDeque<_>>();
         }
     }
 
@@ -76,12 +89,12 @@ impl Data {
     }
 
     /// get recent novels
-    pub fn recent(&self) -> &Vec<LN> {
+    pub fn recent(&self) -> &VecDeque<LN> {
         &self.recent_novels
     }
 
     /// get recent novels but mutable
-    pub fn recent_mut(&mut self) -> &mut Vec<LN> {
+    pub fn recent_mut(&mut self) -> &mut VecDeque<LN> {
         &mut self.recent_novels
     }
 }

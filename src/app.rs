@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::{
     data::{Data, LN},
@@ -6,6 +7,7 @@ use crate::{
     state::State,
     Res,
 };
+
 use cursive::{
     align::{Align, HAlign},
     direction::Orientation,
@@ -21,6 +23,7 @@ use cursive::{
 };
 use log::{info, LevelFilter};
 use owo_colors::OwoColorize;
+use parking_lot::RwLock;
 
 fn get_theme() -> Theme {
     let path: PathBuf = "theme.toml".into();
@@ -37,6 +40,11 @@ fn get_theme() -> Theme {
         t.palette[PaletteColor::Background] = Color::Dark(BaseColor::Black);
         t.palette[PaletteColor::View] = Color::Dark(BaseColor::Black);
         t.palette[PaletteColor::Primary] = Color::Light(BaseColor::White);
+
+        t.palette[PaletteColor::Secondary] = Color::Light(BaseColor::Black);
+        t.palette[PaletteColor::Highlight] = Color::Dark(BaseColor::Blue);
+        t.palette[PaletteColor::HighlightText] = Color::Dark(BaseColor::Black);
+        t.palette[PaletteColor::HighlightInactive] = Color::Light(BaseColor::Black);
 
         t
     }
@@ -59,7 +67,6 @@ pub fn run() -> Res<()> {
 
     siv.add_global_callback('q', Cursive::quit);
     siv.add_global_callback('D', Cursive::toggle_debug_console);
-    siv.add_global_callback('s', |siv| search_view(siv, None));
 
     home_view(siv);
 
@@ -146,6 +153,7 @@ fn reader_view(siv: &mut Cursive) {
     siv.add_fullscreen_layer(layout);
 
     siv.clear_global_callbacks('r');
+    siv.clear_global_callbacks('s');
     siv.add_global_callback('h', home_view);
 }
 
@@ -272,9 +280,91 @@ fn home_view(siv: &mut Cursive) {
     siv.clear_global_callbacks('h');
 
     siv.pop_layer();
-    siv.add_fullscreen_layer(DummyView); // TODO: Write the home view
+
+    siv.add_fullscreen_layer(DummyView);
+
+    let data = Data::load();
+
+    if data.is_err() {
+        error_panel(siv, "Data missing/corrupted. Regenerating");
+        let res = Data::new().save();
+
+        assert!(res.is_ok(), "Failed to generate data. Please check that {:?} is accessible by your user. Error was: {}",
+                Data::data_folder().yellow(), res.unwrap_err().yellow());
+    }
+
+    let data = data.unwrap();
+
+    let mut main_view = LinearLayout::vertical();
+
+    main_view.add_child(
+        TextView::new(format!("{}", "Welcome to `lncli`".bold()))
+            .center()
+            .full_width(),
+    );
+    main_view.add_child(
+        TextView::new(format!(
+            "There are currently {} tracked novels",
+            data.tracked().len().to_string().yellow()
+        ))
+        .center()
+        .full_width(),
+    );
+
+    let submit = |s: &mut Cursive, novel: &LN| {
+        let ch = format!("/chapter-{}.html", novel.last_chapter);
+        load_url(s, &novel.url.replace(".html", &ch));
+        reader_view(s);
+    };
+
+    let tv = {
+        let mut sv = SelectView::new();
+        for x in data.tracked() {
+            sv.add_item(format!("{} ({})", &x.name, x.last_chapter), x.clone());
+        }
+
+        sv.set_on_submit(submit);
+
+        sv.h_align(HAlign::Center)
+    };
+
+    let tracked_panel = Panel::new(tv).title("Tracked Novels").full_screen();
+
+    let rv = {
+        let mut sv = SelectView::new();
+        for x in data.recent().iter() {
+            sv.add_item(format!("{} ({})", &x.name, x.last_chapter), x.clone());
+        }
+
+        sv.set_on_submit(submit);
+
+        sv.h_align(HAlign::Center)
+    };
+
+    let recent_panel = Panel::new(rv).title("Recent Novels").full_screen();
+
+    main_view.add_child(
+        LinearLayout::horizontal()
+            .child(tracked_panel)
+            .child(recent_panel),
+    );
+
+    main_view.add_child(
+        TextView::new(format!(
+            "{q}uit, {r}eader, {s}earch, {enter} to select, {arrow_keys} to navigate",
+            q = "q".yellow(),
+            r = "r".yellow(),
+            s = "s".yellow(),
+            enter = "enter".yellow(),
+            arrow_keys = "arrow keys".yellow()
+        ))
+        .align(Align::bot_right()),
+    );
+
+    siv.add_fullscreen_layer(main_view.full_height());
 
     siv.add_global_callback('r', reader_view);
+    siv.add_global_callback('s', |siv| search_view(siv, None));
 }
 
 fn load_url(siv: &mut Cursive, url: &str) {
@@ -307,11 +397,24 @@ fn load_url(siv: &mut Cursive, url: &str) {
         data.unwrap()
     };
 
-    data.recent_mut().push(LN {
+    data.recent_mut().push_front(LN {
         name: output.name.clone(),
         url: url.to_owned(),
         last_chapter: output.chapter,
     });
+
+    let test_url = url.split_at(url.find("chapter-").unwrap()).0;
+
+    if data.tracked().iter().any(|x| x.url.starts_with(test_url)) {
+        info!("found tracked novel, updating latest chapter read");
+
+        data.tracked_mut()
+            .iter_mut()
+            .filter(|x| x.url.starts_with(test_url))
+            .for_each(|x| {
+                x.last_chapter = output.chapter;
+            });
+    }
 
     let save_res = data.save();
 
@@ -343,37 +446,7 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
         }
     };
 
-    let search_results = {
-        if let Some(search) = &results {
-            let mut sv = SelectView::new().h_align(HAlign::Center);
-
-            if search.results.is_empty() {
-                sv.set_on_submit(|s, _| {
-                    s.pop_layer();
-                    error_panel(s, "No results found.\nTry a shorter query.");
-                });
-                return;
-            }
-
-            for (url, label) in search.results.clone() {
-                sv.add_item(label, url);
-            }
-
-            sv.set_on_submit(|s, url| {
-                let url = url.as_str();
-
-                let url = url.replace(".html", "/chapter-1.html");
-
-                load_url(s, &url);
-                s.pop_layer();
-                reader_view(s);
-            });
-
-            Some(sv)
-        } else {
-            None
-        }
-    };
+    let search_results = { results.as_ref().map(create_sv) };
 
     let search_layout = {
         let mut layout = LinearLayout::vertical();
@@ -405,7 +478,8 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
     let results_mode_text = {
         if results_mode {
             format!(
-                "{esc} to go back, {enter} to select, {arrow_keys} to navigate",
+                "{t}rack, {esc} to go back, {enter} to select, {arrow_keys} to navigate",
+                t = "t".yellow(),
                 esc = "esc".yellow(),
                 enter = "enter".yellow(),
                 arrow_keys = "arrow keys".yellow()
@@ -433,9 +507,74 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
 
     let view = OnEventView::new(panel).on_event(Key::Esc, |s| {
         s.pop_layer();
+        s.pop_layer();
+
+        home_view(s);
     });
 
     siv.add_layer(view);
+}
+
+fn create_sv(search: &Search) -> cursive::views::OnEventView<cursive::views::SelectView<url::Url>> {
+    let mut sv = SelectView::new().h_align(HAlign::Center);
+
+    if search.results.is_empty() {
+        sv.set_on_submit(|s, _| {
+            s.pop_layer();
+            error_panel(s, "No results found.\nTry a shorter query.");
+        });
+        return OnEventView::new(sv);
+    }
+
+    for (url, label) in search.results.clone() {
+        sv.add_item(label, url);
+    }
+
+    sv.set_on_submit(|s, url| {
+        let url = url.as_str();
+
+        let url = url.replace(".html", "/chapter-1.html");
+
+        load_url(s, &url);
+        s.pop_layer();
+        reader_view(s);
+    });
+
+    let selected = Arc::new(RwLock::new(Some(search.results[0].0.to_string())));
+
+    let si = selected.clone();
+    sv.set_on_select(move |_, url| {
+        let url = url.as_str();
+
+        si.write_arc().replace(url.to_owned());
+    });
+
+    OnEventView::new(sv).on_event('t', move |s| {
+        let selected = selected.read_arc();
+        if selected.is_none() {
+            info!("Selected was none");
+            return;
+        }
+        let sel = selected.clone().unwrap();
+
+        info!("Selected: {}", sel.green());
+
+        let data = Data::load();
+
+        if let Ok(mut data) = data {
+            data.tracked_mut().push(LN {
+                name: scrape::get_name(&sel).unwrap(),
+                url: sel.clone(),
+                last_chapter: 1,
+            });
+
+            let data = data.save();
+
+            if let Err(e) = data {
+                error_panel(s, &e.to_string());
+            }
+        }
+    })
 }
 
 fn search_url(siv: &mut Cursive, query: &str) {
