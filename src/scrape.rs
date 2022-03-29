@@ -189,6 +189,46 @@ pub fn load(url: &str) -> Res<Output> {
     })
 }
 
+pub fn update_check(url: &str, last_chapter: usize) -> Res<bool> {
+    if url.contains("/chapter-") {
+        bail!("invalid url: {}", url.green()); // TODO: Nicer error messages
+    }
+
+    let chapter_regex = Regex::new(r"chapter-(\d+)\.html").unwrap();
+
+    let agent = Agent::new();
+
+    let res = agent.get(url).call()?;
+
+    if res.status() != 200 {
+        bail!(
+            "got status code {}: {}", // TODO: Nicer error messages
+            res.status().yellow(),
+            res.status_text().green()
+        );
+    }
+
+    let html = res.into_string()?;
+
+    let dom = Vis::load(html).map_err(|e| eyre!("{}", e.green()))?;
+
+    let max_chapters = {
+        let item = dom.find("body > div.main > div > div > div.col-content > div.m-newest1 > ul > li:nth-child(1) > a").attr("href").unwrap().to_string();
+
+        let max_chapters = chapter_regex.captures(&item);
+
+        let max_chapters = if let Some(max_chapters) = max_chapters {
+            max_chapters.get(1).unwrap().as_str()
+        } else {
+            bail!("could not find max chapters, regex failed"); // TODO: Nicer error messages
+        };
+
+        max_chapters.trim().parse::<usize>()?
+    };
+
+    Ok(max_chapters > last_chapter)
+}
+
 #[derive(Debug, Clone)]
 pub struct Output {
     pub name: String,

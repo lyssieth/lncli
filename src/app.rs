@@ -68,7 +68,7 @@ pub fn run() -> Res<()> {
     siv.add_global_callback('q', Cursive::quit);
     siv.add_global_callback('D', Cursive::toggle_debug_console);
 
-    home_view(siv);
+    home_view(siv, &None);
 
     siv.run_crossterm()?;
 
@@ -82,7 +82,7 @@ fn reader_view(siv: &mut Cursive) {
 
     if state.is_none() {
         siv.pop_layer();
-        home_view(siv);
+        home_view(siv, &None);
         error_panel(
             siv,
             "Nothing is configured to be read. Please use `s`, or select from the home screen.",
@@ -147,14 +147,15 @@ fn reader_view(siv: &mut Cursive) {
         })
         .on_event(Key::Left, move |siv| {
             previous_chapter(siv, &state.clone());
+        })
+        .on_event('h', |siv| {
+            home_view(siv, &None);
         });
 
     siv.pop_layer();
     siv.add_fullscreen_layer(layout);
 
     siv.clear_global_callbacks('r');
-    siv.clear_global_callbacks('s');
-    siv.add_global_callback('h', home_view);
 }
 
 fn select_chapter(siv: &mut Cursive, state: &State) {
@@ -274,10 +275,8 @@ fn next_chapter(siv: &mut Cursive, state: &State) {
     reader_view(siv);
 }
 
-fn home_view(siv: &mut Cursive) {
+fn home_view(siv: &mut Cursive, updates: &Option<Vec<LN>>) {
     info!("home view");
-
-    siv.clear_global_callbacks('h');
 
     siv.pop_layer();
 
@@ -320,7 +319,15 @@ fn home_view(siv: &mut Cursive) {
     let tv = {
         let mut sv = SelectView::new();
         for x in data.tracked() {
-            sv.add_item(format!("{} ({})", &x.name, x.last_chapter), x.clone());
+            if let Some(updates) = &updates {
+                if updates.iter().any(|u| u.name == x.name) {
+                    sv.add_item(format!("* {} ({})", &x.name, x.last_chapter), x.clone());
+                } else {
+                    sv.add_item(format!("{} ({})", &x.name, x.last_chapter), x.clone());
+                }
+            } else {
+                sv.add_item(format!("{} ({})", &x.name, x.last_chapter), x.clone());
+            }
         }
 
         sv.set_on_submit(submit);
@@ -351,20 +358,59 @@ fn home_view(siv: &mut Cursive) {
 
     main_view.add_child(
         TextView::new(format!(
-            "{q}uit, {r}eader, {s}earch, {enter} to select, {arrow_keys} to navigate",
+            "{q}uit, {r}eader, {s}earch, {u}pdate check, {enter} to select, {arrow_keys} to navigate",
             q = "q".yellow(),
             r = "r".yellow(),
             s = "s".yellow(),
+            u = "u".yellow(),
             enter = "enter".yellow(),
             arrow_keys = "arrow keys".yellow()
         ))
         .align(Align::bot_right()),
     );
 
-    siv.add_fullscreen_layer(main_view.full_height());
+    let main_view = OnEventView::new(main_view)
+        .on_event('r', reader_view)
+        .on_event('s', |s| {
+            search_view(s, None);
+        })
+        .on_event('u', |s| {
+            update_check(s);
+        });
 
-    siv.add_global_callback('r', reader_view);
-    siv.add_global_callback('s', |siv| search_view(siv, None));
+    siv.add_fullscreen_layer(main_view.full_height());
+}
+
+fn update_check(cursive: &mut Cursive) {
+    info!("update check");
+
+    let data = Data::load();
+
+    if data.is_err() {
+        error_panel(cursive, "Failed to load data");
+        return;
+    }
+
+    let data = data.unwrap();
+
+    let mut found = Vec::new();
+
+    for x in data.tracked() {
+        let check = scrape::update_check(&x.url, x.last_chapter);
+
+        if let Ok(check) = check {
+            if check {
+                found.push(x.clone());
+            }
+        } else {
+            error_panel(
+                cursive,
+                &format!("Failed to check for updates: {}", check.unwrap_err()),
+            );
+        }
+    }
+
+    home_view(cursive, &Some(found));
 }
 
 fn load_url(siv: &mut Cursive, url: &str) {
@@ -509,7 +555,7 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
         s.pop_layer();
         s.pop_layer();
 
-        home_view(s);
+        home_view(s, &None);
     });
 
     siv.add_layer(view);
