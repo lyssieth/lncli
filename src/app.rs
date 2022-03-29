@@ -309,6 +309,13 @@ fn home_view(siv: &mut Cursive, updates: &Option<Vec<LN>>) {
         .center()
         .full_width(),
     );
+    main_view.add_child(
+        TextView::new(
+            "The `update check` will also add an asterisk if you aren't caught up, so be aware.",
+        )
+        .center()
+        .full_width(),
+    );
 
     let submit = |s: &mut Cursive, novel: &LN| {
         let ch = format!("/chapter-{}.html", novel.last_chapter);
@@ -450,6 +457,12 @@ fn load_url(siv: &mut Cursive, url: &str) {
     });
 
     let test_url = url.split_at(url.find("chapter-").unwrap()).0;
+    let test_url = test_url[0..test_url.len() - 1].to_owned();
+    let test_url = test_url + ".html";
+
+    info!("test_url is: {}", test_url);
+
+    let test_url = &test_url;
 
     if data.tracked().iter().any(|x| x.url.starts_with(test_url)) {
         info!("found tracked novel, updating latest chapter read");
