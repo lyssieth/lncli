@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use crate::Res;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct LN {
     pub name: String,
     pub url: String,

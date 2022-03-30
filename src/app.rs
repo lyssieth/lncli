@@ -8,6 +8,9 @@ use crate::{
     Res,
 };
 
+use cursive::theme::{Effect, Style};
+use cursive::utils::markup::StyledString;
+use cursive::views::NamedView;
 use cursive::{
     align::{Align, HAlign},
     direction::Orientation,
@@ -21,7 +24,7 @@ use cursive::{
     },
     Cursive, CursiveExt,
 };
-use log::{info, LevelFilter};
+use log::{error, info, LevelFilter};
 use owo_colors::OwoColorize;
 use parking_lot::RwLock;
 
@@ -42,7 +45,7 @@ fn get_theme() -> Theme {
         t.palette[PaletteColor::Primary] = Color::Light(BaseColor::White);
 
         t.palette[PaletteColor::Secondary] = Color::Light(BaseColor::Black);
-        t.palette[PaletteColor::Highlight] = Color::Dark(BaseColor::Blue);
+        t.palette[PaletteColor::Highlight] = Color::Dark(BaseColor::White);
         t.palette[PaletteColor::HighlightText] = Color::Dark(BaseColor::Black);
         t.palette[PaletteColor::HighlightInactive] = Color::Light(BaseColor::Black);
 
@@ -111,26 +114,41 @@ fn reader_view(siv: &mut Cursive) {
 
     let layout = LinearLayout::vertical()
         .child(
-            TextView::new(format!(
-                "{} - Chapter {}/{}",
-                (&state.title).green(),
-                state.chapter.yellow(),
-                state.max_chapters.yellow()
-            ))
+            TextView::new({
+                let mut s = StyledString::new();
+
+                s.append_styled(&state.title, Color::Dark(BaseColor::Green));
+                s.append_plain(" - ");
+                s.append_styled(format!("{}", state.chapter), Color::Dark(BaseColor::Yellow));
+                s.append_plain("/");
+                s.append_styled(
+                    format!("{}", state.max_chapters),
+                    Color::Dark(BaseColor::Yellow),
+                );
+                s
+            })
             .center()
             .fixed_height(2)
             .with_name("title"),
         )
         .child(PaddedView::new(margins, main_content.scrollable()).with_name("main_content"))
         .child(
-            TextView::new(format!(
-                "{q}uit, {c}hapter select, {h}ome view, {s}earch, and {arrow_keys}",
-                c = "c".yellow(),
-                q = "q".yellow(),
-                h = "h".yellow(),
-                s = "s".yellow(),
-                arrow_keys = "arrow keys".yellow()
-            ))
+            TextView::new({
+                let mut s = StyledString::new();
+
+                s.append_styled("q", Color::Dark(BaseColor::Yellow));
+                s.append_plain("uit, ");
+                s.append_styled("c", Color::Dark(BaseColor::Yellow));
+                s.append_plain("hapter select, ");
+                s.append_styled("h", Color::Dark(BaseColor::Yellow));
+                s.append_plain("ome view, ");
+                s.append_styled("s", Color::Dark(BaseColor::Yellow));
+                s.append_plain("earch, ");
+                s.append_styled("arrow keys", Color::Dark(BaseColor::Yellow));
+                s.append_plain(" to navigate");
+
+                s
+            })
             .align(Align::bot_right())
             .with_name("footer"),
         );
@@ -184,7 +202,7 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
                     s,
                     &format!(
                         "please enter a valid number ({})", // TODO: Nicer error messages
-                        chapter.unwrap_err().to_string().red()
+                        chapter.unwrap_err()
                     ),
                 );
                 return;
@@ -211,12 +229,21 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
 
     let layout = LinearLayout::vertical()
         .child(chapter_select)
-        .child(TextView::new(format!(
-            "Enter a number between {} and {}.\nAnd press {enter}",
-            1.yellow(),
-            state.max_chapters.yellow(),
-            enter = "Enter".yellow()
-        )));
+        .child(TextView::new({
+            let mut s = StyledString::new();
+
+            s.append_plain("Enter a number between ");
+            s.append_styled("1", Color::Dark(BaseColor::Yellow));
+            s.append_plain(" and ");
+            s.append_styled(
+                format!("{}", state.max_chapters),
+                Color::Dark(BaseColor::Yellow),
+            );
+            s.append_plain(".\nAnd press ");
+            s.append_styled("Enter", Color::Dark(BaseColor::Yellow));
+
+            s
+        }));
     let panel = Panel::new(layout).title("Chapter Select");
 
     siv.add_layer(panel);
@@ -226,8 +253,28 @@ fn error_panel(siv: &mut Cursive, err: &str) {
     info!("error panel");
 
     let layout = LinearLayout::vertical()
-        .child(TextView::new(err).center())
-        .child(TextView::new(format!("Press {esc} to close", esc = "esc".yellow())).center());
+        .child(
+            TextView::new({
+                let mut s = StyledString::new();
+
+                s.append_styled(err, Color::Dark(BaseColor::Red));
+
+                s
+            })
+            .center(),
+        )
+        .child(
+            TextView::new({
+                let mut s = StyledString::new();
+
+                s.append_plain("Press ");
+                s.append_styled("esc", Color::Dark(BaseColor::Yellow));
+                s.append_plain(" to close");
+
+                s
+            })
+            .center(),
+        );
 
     let panel = Panel::new(layout).title("Error");
     let panel = OnEventView::new(panel).on_event(Key::Esc, |s| {
@@ -297,18 +344,27 @@ fn home_view(siv: &mut Cursive, updates: &Option<Vec<LN>>) {
     let mut main_view = LinearLayout::vertical();
 
     main_view.add_child(
-        TextView::new(format!("{}", "Welcome to `lncli`".bold()))
-            .center()
-            .full_width(),
-    );
-    main_view.add_child(
-        TextView::new(format!(
-            "There are currently {} tracked novels",
-            data.tracked().len().to_string().yellow()
-        ))
+        TextView::new({
+            let mut s = StyledString::new();
+
+            s.append_styled("Welcome to `lncli`", Effect::Bold);
+
+            s
+        })
         .center()
         .full_width(),
     );
+
+    let mut tracked_count = StyledString::new();
+
+    tracked_count.append_plain("There are currently ");
+    tracked_count.append_styled(
+        format!("{}", data.tracked().len()),
+        Color::Dark(BaseColor::Yellow),
+    );
+    tracked_count.append_plain(" tracked novels.");
+
+    main_view.add_child(TextView::new(tracked_count).center().full_width());
     main_view.add_child(
         TextView::new(
             "The `update check` will also add an asterisk if you aren't caught up, so be aware.",
@@ -323,37 +379,11 @@ fn home_view(siv: &mut Cursive, updates: &Option<Vec<LN>>) {
         reader_view(s);
     };
 
-    let tv = {
-        let mut sv = SelectView::new();
-        for x in data.tracked() {
-            if let Some(updates) = &updates {
-                if updates.iter().any(|u| u.name == x.name) {
-                    sv.add_item(format!("* {} ({})", &x.name, x.last_chapter), x.clone());
-                } else {
-                    sv.add_item(format!("{} ({})", &x.name, x.last_chapter), x.clone());
-                }
-            } else {
-                sv.add_item(format!("{} ({})", &x.name, x.last_chapter), x.clone());
-            }
-        }
-
-        sv.set_on_submit(submit);
-
-        sv.h_align(HAlign::Center)
-    };
+    let tv = create_tv(&data, updates, submit);
 
     let tracked_panel = Panel::new(tv).title("Tracked Novels").full_screen();
 
-    let rv = {
-        let mut sv = SelectView::new();
-        for x in data.recent().iter() {
-            sv.add_item(format!("{} ({})", &x.name, x.last_chapter), x.clone());
-        }
-
-        sv.set_on_submit(submit);
-
-        sv.h_align(HAlign::Center)
-    };
+    let rv = create_rv(&data, submit);
 
     let recent_panel = Panel::new(rv).title("Recent Novels").full_screen();
 
@@ -363,18 +393,9 @@ fn home_view(siv: &mut Cursive, updates: &Option<Vec<LN>>) {
             .child(recent_panel),
     );
 
-    main_view.add_child(
-        TextView::new(format!(
-            "{q}uit, {r}eader, {s}earch, {u}pdate check, {enter} to select, {arrow_keys} to navigate",
-            q = "q".yellow(),
-            r = "r".yellow(),
-            s = "s".yellow(),
-            u = "u".yellow(),
-            enter = "enter".yellow(),
-            arrow_keys = "arrow keys".yellow()
-        ))
-        .align(Align::bot_right()),
-    );
+    let controls_text = get_home_controls();
+
+    main_view.add_child(TextView::new(controls_text).align(Align::bot_right()));
 
     let main_view = OnEventView::new(main_view)
         .on_event('r', reader_view)
@@ -386,6 +407,169 @@ fn home_view(siv: &mut Cursive, updates: &Option<Vec<LN>>) {
         });
 
     siv.add_fullscreen_layer(main_view.full_height());
+}
+
+fn get_home_controls() -> StyledString {
+    let mut text = StyledString::new();
+
+    text.append_styled("q", Color::Dark(BaseColor::Yellow));
+    text.append_plain("uit, ");
+    text.append_styled("r", Color::Dark(BaseColor::Yellow));
+    text.append_plain("eader, ");
+    text.append_styled("t", Color::Dark(BaseColor::Yellow));
+    text.append_plain("rack/untrack, ");
+    text.append_styled("s", Color::Dark(BaseColor::Yellow));
+    text.append_plain("earch, ");
+    text.append_styled("u", Color::Dark(BaseColor::Yellow));
+    text.append_plain("pdate check, ");
+    text.append_styled("enter", Color::Dark(BaseColor::Yellow));
+    text.append_plain(" to select, ");
+    text.append_styled("arrow keys", Color::Dark(BaseColor::Yellow));
+    text.append_plain(" to navigate");
+
+    text
+}
+
+fn create_rv(data: &Data, submit: fn(&mut Cursive, &LN)) -> OnEventView<NamedView<SelectView<LN>>> {
+    let label = |name: &str, last_chapter: usize| {
+        let mut s = StyledString::new();
+
+        s.append_styled(
+            name,
+            Style::merge(&[Color::Dark(BaseColor::Red).into(), Effect::Bold.into()]),
+        );
+        s.append_plain(" (");
+        s.append_styled(
+            format!("{}", last_chapter),
+            Style::merge(&[Color::Dark(BaseColor::Magenta).into(), Effect::Bold.into()]),
+        );
+        s.append_plain(")");
+
+        s
+    };
+
+    let rv = {
+        let mut sv = SelectView::new();
+        for x in data.recent().iter() {
+            sv.add_item(label(&x.name, x.last_chapter), x.clone());
+        }
+
+        sv.set_on_submit(submit);
+
+        sv.h_align(HAlign::Center).with_name("recent_view")
+    };
+
+    let data = data.clone();
+
+    OnEventView::new(rv).on_event('t', move |s| {
+        let mut data = data.clone();
+        let rv = s.find_name::<SelectView<LN>>("recent_view");
+
+        if rv.is_none() {
+            return;
+        }
+        let rv = rv.unwrap();
+
+        let selected = rv.selected_id();
+
+        if selected.is_none() {
+            return;
+        }
+
+        let selected = selected.unwrap();
+        let item = rv.get_item(selected).unwrap();
+
+        data.tracked_mut().push(item.1.clone());
+
+        if let Err(e) = data.save() {
+            error_panel(s, &format!("Failed to save data: {}", e));
+            error!("Failed to save data: {}", e);
+        }
+
+        home_view(s, &None);
+    })
+}
+
+fn create_tv(
+    data: &Data,
+    updates: &Option<Vec<LN>>,
+    submit: fn(&mut Cursive, &LN),
+) -> OnEventView<NamedView<SelectView<LN>>> {
+    let label = |name: &str, last_chapter: usize, update: bool| {
+        let mut s = StyledString::new();
+
+        if update {
+            s.append_styled(
+                "*",
+                Style::merge(&[Color::Dark(BaseColor::Magenta).into(), Effect::Bold.into()]),
+            );
+            s.append_plain(" ");
+        }
+
+        s.append_styled(
+            name,
+            Style::merge(&[Color::Dark(BaseColor::Red).into(), Effect::Bold.into()]),
+        );
+        s.append_plain(" (");
+        s.append_styled(
+            format!("{}", last_chapter),
+            Style::merge(&[Color::Dark(BaseColor::Magenta).into(), Effect::Bold.into()]),
+        );
+        s.append_plain(")");
+
+        s
+    };
+
+    let updates = updates.clone();
+    let tv = {
+        let mut sv = SelectView::new();
+        for x in data.tracked() {
+            if let Some(updates) = &updates {
+                if updates.iter().any(|u| u.name == x.name) {
+                    sv.add_item(label(&x.name, x.last_chapter, true), x.clone());
+                } else {
+                    sv.add_item(label(&x.name, x.last_chapter, false), x.clone());
+                }
+            } else {
+                sv.add_item(label(&x.name, x.last_chapter, false), x.clone());
+            }
+        }
+
+        sv.set_on_submit(submit);
+
+        sv.h_align(HAlign::Center).with_name("tracked_view")
+    };
+
+    let data = data.clone();
+
+    OnEventView::new(tv).on_event('t', move |s| {
+        let updates = &updates;
+        let mut data = data.clone();
+        let sv = s.find_name::<SelectView<LN>>("tracked_view");
+
+        if sv.is_none() {
+            return;
+        }
+        let sv = sv.unwrap();
+
+        let selected = sv.selected_id();
+
+        if selected.is_none() {
+            return;
+        }
+
+        let selected = selected.unwrap();
+        let item = sv.get_item(selected).unwrap();
+
+        data.tracked_mut().retain(|x| x != item.1);
+
+        if let Err(e) = data.save() {
+            error_panel(s, &format!("Failed to save data: {}", e));
+            error!("Failed to save data: {}", e);
+        }
+
+        home_view(s, updates);
+    })
 }
 
 fn update_check(cursive: &mut Cursive) {
@@ -425,7 +609,7 @@ fn load_url(siv: &mut Cursive, url: &str) {
     let output = scrape::load(url);
 
     if let Err(e) = output {
-        error_panel(siv, &format!("{}", e.to_string().red()));
+        error_panel(siv, &e.to_string());
         panic!("{}", e);
     }
 
@@ -513,15 +697,20 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
         if let Some(search_results) = search_results {
             let query = results.unwrap().query;
             let query = query.trim();
-            let query = "        ".to_owned() + query;
 
             layout.add_child(
-                TextView::new(query.green().to_string())
-                    .h_align(HAlign::Center)
-                    .no_wrap(),
+                TextView::new({
+                    let mut s = StyledString::new();
+
+                    s.append_styled(query, Color::Dark(BaseColor::Green));
+
+                    s
+                })
+                .h_align(HAlign::Center)
+                .no_wrap(),
             );
             layout.add_child(
-                TextView::new("-".repeat(query.len()))
+                TextView::new("-".repeat(query.len() + 2))
                     .h_align(HAlign::Center)
                     .no_wrap(),
             );
@@ -536,19 +725,27 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
 
     let results_mode_text = {
         if results_mode {
-            format!(
-                "{t}rack, {esc} to go back, {enter} to select, {arrow_keys} to navigate",
-                t = "t".yellow(),
-                esc = "esc".yellow(),
-                enter = "enter".yellow(),
-                arrow_keys = "arrow keys".yellow()
-            )
+            let mut s = StyledString::new();
+
+            s.append_styled("t", Color::Dark(BaseColor::Yellow));
+            s.append_plain("rack, ");
+            s.append_styled("esc", Color::Dark(BaseColor::Yellow));
+            s.append_plain(" to go back, ");
+            s.append_styled("enter", Color::Dark(BaseColor::Yellow));
+            s.append_plain(" to select, ");
+            s.append_styled("arrow keys", Color::Dark(BaseColor::Yellow));
+            s.append_plain(" to navigate");
+
+            s
         } else {
-            format!(
-                "{esc} to go back, {enter} to search",
-                esc = "esc".yellow(),
-                enter = "Enter".yellow()
-            )
+            let mut s = StyledString::new();
+
+            s.append_styled("esc", Color::Dark(BaseColor::Yellow));
+            s.append_plain(" to go back, ");
+            s.append_styled("enter", Color::Dark(BaseColor::Yellow));
+            s.append_plain(" to search");
+
+            s
         }
     };
 
@@ -644,7 +841,7 @@ fn search_url(siv: &mut Cursive, query: &str) {
     siv.pop_layer();
     if let Err(e) = &output {
         search_view(siv, None);
-        error_panel(siv, &format!("{}", e.to_string().red()));
+        error_panel(siv, &e.to_string());
         return;
     }
 
