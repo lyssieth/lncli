@@ -689,6 +689,11 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
                 return;
             }
 
+            if text.len() < 3 {
+                error_panel(s, "please enter at least 3 characters");
+                return;
+            }
+
             search_url(s, text);
         });
 
