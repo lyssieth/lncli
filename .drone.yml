@@ -12,7 +12,3 @@ steps:
     commands:
       - rustup component add clippy
       - cargo clippy --all
-  - name: test
-    image: rust:latest
-    commands:
-      - cargo test --all
