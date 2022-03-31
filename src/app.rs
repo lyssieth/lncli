@@ -288,6 +288,8 @@ fn previous_chapter(siv: &mut Cursive, state: &State) {
     siv.pop_layer();
 
     if state.chapter == 1 {
+        load_url(siv, &state.url);
+        reader_view(siv);
         error_panel(siv, "You are already on the first chapter");
         return;
     }
