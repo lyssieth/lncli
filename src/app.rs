@@ -481,7 +481,7 @@ fn create_rv(data: &Data, submit: fn(&mut Cursive, &LN)) -> OnEventView<NamedVie
         let selected = selected.unwrap();
         let item = rv.get_item(selected).unwrap();
 
-        data.tracked_mut().push(item.1.clone());
+        data.add_tracked(item.1.clone());
 
         if let Err(e) = data.save() {
             error_panel(s, &format!("Failed to save data: {}", e));
@@ -826,7 +826,7 @@ fn create_sv(search: &Search) -> cursive::views::OnEventView<cursive::views::Sel
         let data = Data::load();
 
         if let Ok(mut data) = data {
-            data.tracked_mut().push(LN {
+            data.add_tracked(LN {
                 name: scrape::get_name(&sel).unwrap(),
                 url: sel.clone(),
                 last_chapter: 1,

@@ -101,6 +101,15 @@ impl Data {
         &mut self.tracked_novels
     }
 
+    /// add a tracked novel, with a duplicate check
+    pub fn add_tracked(&mut self, novel: LN) {
+        if self.tracked_novels.iter().any(|v| v.name == novel.name) {
+            return;
+        }
+
+        self.tracked_novels.push(novel);
+    }
+
     /// get recent novels
     pub fn recent(&self) -> &VecDeque<LN> {
         &self.recent_novels
