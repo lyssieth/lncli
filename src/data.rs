@@ -68,21 +68,27 @@ impl Data {
     }
 
     fn prune(&mut self) {
-        if self.recent_novels.len() > 10 {
-            self.recent_novels = self
-                .recent_novels
-                .clone()
-                .into_iter()
-                .fold(VecDeque::new(), |mut acc, x| {
-                    if !acc.contains(&x) {
-                        acc.push_back(x);
+        self.recent_novels = self
+            .recent_novels
+            .clone()
+            .into_iter()
+            .fold(VecDeque::new(), |mut acc: VecDeque<LN>, x| {
+                if acc.iter().any(|v| v.name == x.name) {
+                    // get the item and compare the last chapter
+                    let item = acc.iter_mut().find(|v| v.name == x.name).unwrap();
+
+                    if item.last_chapter < x.last_chapter {
+                        *item = x;
                     }
-                    acc
-                })
-                .into_iter()
-                .take(10)
-                .collect::<VecDeque<_>>();
-        }
+                } else {
+                    acc.push_back(x);
+                }
+
+                acc
+            })
+            .into_iter()
+            .take(10)
+            .collect::<VecDeque<_>>();
     }
 
     /// get tracked novels
