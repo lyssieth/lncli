@@ -329,7 +329,7 @@ fn home_view(siv: &mut Cursive, updates: &Option<Vec<LN>>) {
 
     siv.add_fullscreen_layer(DummyView);
 
-    let data = Data::load();
+    let mut data = Data::load();
 
     if data.is_err() {
         error_panel(siv, "Data missing/corrupted. Regenerating");
@@ -337,6 +337,8 @@ fn home_view(siv: &mut Cursive, updates: &Option<Vec<LN>>) {
 
         assert!(res.is_ok(), "Failed to generate data. Please check that {:?} is accessible by your user. Error was: {}",
                 Data::data_folder().yellow(), res.unwrap_err().yellow());
+
+        data = Data::load();
     }
 
     let data = data.unwrap();
@@ -636,7 +638,13 @@ fn load_url(siv: &mut Cursive, url: &str) {
 
     data.recent_mut().push_front(LN {
         name: output.name.clone(),
-        url: url.to_owned(),
+        url: {
+            // ugly ass hack
+            let mut a = url.split_once("/chapter").unwrap().0.to_string();
+            a.push_str(".html");
+
+            a
+        },
         last_chapter: output.chapter,
     });
 

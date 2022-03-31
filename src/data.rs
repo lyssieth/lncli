@@ -73,6 +73,13 @@ impl Data {
                 .recent_novels
                 .clone()
                 .into_iter()
+                .fold(VecDeque::new(), |mut acc, x| {
+                    if !acc.contains(&x) {
+                        acc.push_back(x);
+                    }
+                    acc
+                })
+                .into_iter()
                 .take(10)
                 .collect::<VecDeque<_>>();
         }
