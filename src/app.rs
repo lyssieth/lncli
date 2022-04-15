@@ -155,6 +155,7 @@ fn reader_view(siv: &mut Cursive) {
 
     let s1 = state.clone();
     let s2 = state.clone();
+    let s3 = state.clone();
 
     let layout = OnEventView::new(layout)
         .on_event('c', move |siv| {
@@ -164,10 +165,18 @@ fn reader_view(siv: &mut Cursive) {
             next_chapter(siv, &s2.clone());
         })
         .on_event(Key::Left, move |siv| {
-            previous_chapter(siv, &state.clone());
+            previous_chapter(siv, &s3.clone());
         })
         .on_event('h', |siv| {
             home_view(siv, &None);
+        })
+        .on_event('O', move |siv| {
+            let res = open::that(&state.url);
+
+            if res.is_err() {
+                error_panel(siv, "Could not open the url.");
+                error!("Could not open the url: {}", res.err().unwrap());
+            }
         });
 
     siv.pop_layer();
