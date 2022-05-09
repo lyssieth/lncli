@@ -1,7 +1,5 @@
 # lncli
 
-[//]: # ([![Build Status]&#40;https://drone.lys.ee/api/badges/Lyssieth/lncli/status.svg?ref=refs/heads/dommy-mommy&#41;]&#40;https://drone.lys.ee/Lyssieth/lncli&#41;)
-
 A CLI for reading Light Novels.
 
 ## Features
