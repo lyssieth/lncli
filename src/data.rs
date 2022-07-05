@@ -92,7 +92,7 @@ impl Data {
     }
 
     /// get tracked novels
-    pub fn tracked(&self) -> &Vec<LN> {
+    pub const fn tracked(&self) -> &Vec<LN> {
         &self.tracked_novels
     }
 
@@ -111,7 +111,7 @@ impl Data {
     }
 
     /// get recent novels
-    pub fn recent(&self) -> &VecDeque<LN> {
+    pub const fn recent(&self) -> &VecDeque<LN> {
         &self.recent_novels
     }
 

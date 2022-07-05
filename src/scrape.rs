@@ -4,6 +4,7 @@ use color_eyre::eyre::{bail, eyre};
 use log::info;
 use owo_colors::OwoColorize;
 use regex::Regex;
+use std::fmt::Write;
 use ureq::Agent;
 use url::Url;
 use visdom::Vis;
@@ -60,7 +61,7 @@ pub struct Search {
     pub results: Vec<(Url, String)>,
 }
 
-pub(crate) fn get_name(url: &str) -> Res<String> {
+pub fn get_name(url: &str) -> Res<String> {
     let agent = Agent::new();
 
     let res = agent.get(url).call()?;
@@ -153,11 +154,10 @@ pub fn load(url: &str) -> Res<Output> {
             let el = dom.find("#main1 > div > div > div.top > span");
             let chapter_title = el.text().to_owned();
 
-            if let Some(split) = chapter_title.split_once('-') {
-                split.1.trim().to_owned()
-            } else {
-                chapter_title
-            }
+            chapter_title
+                .clone()
+                .split_once('-')
+                .map_or(chapter_title, |split| split.1.trim().to_owned())
         };
         info!("Found chapter title: {}", chapter_title.green());
 
@@ -170,7 +170,7 @@ pub fn load(url: &str) -> Res<Output> {
                 let text = x.text_content();
 
                 if !text.trim().is_empty() {
-                    content.push_str(&format!("{}\n\n", text));
+                    write!(&mut content, "{}\n\n", text);
                 }
             }
 

@@ -748,9 +748,9 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
     };
 
     let results_mode_text = {
-        if results_mode {
-            let mut s = StyledString::new();
+        let mut s = StyledString::new();
 
+        if results_mode {
             s.append_styled("t", Color::Dark(BaseColor::Yellow));
             s.append_plain("rack, ");
             s.append_styled("esc", Color::Dark(BaseColor::Yellow));
@@ -759,18 +759,14 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
             s.append_plain(" to select, ");
             s.append_styled("arrow keys", Color::Dark(BaseColor::Yellow));
             s.append_plain(" to navigate");
-
-            s
         } else {
-            let mut s = StyledString::new();
-
             s.append_styled("esc", Color::Dark(BaseColor::Yellow));
             s.append_plain(" to go back, ");
             s.append_styled("enter", Color::Dark(BaseColor::Yellow));
             s.append_plain(" to search");
-
-            s
         }
+
+        s
     };
 
     let controls = TextView::new(results_mode_text).align(Align::bot_right());
