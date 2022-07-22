@@ -1,6 +1,6 @@
 [package]
 name = "lncli"
-version = "1.0.0-alpha"
+version = "1.0.0"
 edition = "2021"
 license = "MIT"
 description = "A simple TUI based light novel reader."
@@ -9,7 +9,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-color-eyre = "0.6.1"
+color-eyre = "0.6.2"
 cursive = { version = "0.18.0", features = [
     "crossterm-backend",
     "markdown",
@@ -18,12 +18,12 @@ cursive = { version = "0.18.0", features = [
 dirs = "4.0.0"
 lipsum = "0.8.2"
 log = "0.4.17"
-open = "3.0.1"
+open = "3.0.2"
 owo-colors = "3.4.0"
 parking_lot = { version = "0.12.1", features = ["arc_lock"] }
-regex = "1.5.6"
-serde = { version = "1.0.138", features = ["derive"] }
+regex = "1.6.0"
+serde = { version = "1.0.140", features = ["derive"] }
 serde_json = "1.0.82"
-ureq = "2.4.0"
+ureq = "2.5.0"
 url = "2.2.2"
 visdom = "0.5.2"
