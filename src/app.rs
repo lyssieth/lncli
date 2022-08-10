@@ -41,12 +41,12 @@ fn get_theme() -> Theme {
         };
 
         t.palette[PaletteColor::Background] = Color::Dark(BaseColor::Black);
-        t.palette[PaletteColor::View] = Color::Dark(BaseColor::Black);
+        t.palette[PaletteColor::View] = Color::TerminalDefault;
         t.palette[PaletteColor::Primary] = Color::Light(BaseColor::White);
 
         t.palette[PaletteColor::Secondary] = Color::Light(BaseColor::Black);
-        t.palette[PaletteColor::Highlight] = Color::Dark(BaseColor::White);
-        t.palette[PaletteColor::HighlightText] = Color::Dark(BaseColor::Black);
+        t.palette[PaletteColor::Highlight] = Color::Dark(BaseColor::Black);
+        t.palette[PaletteColor::HighlightText] = Color::Light(BaseColor::White);
         t.palette[PaletteColor::HighlightInactive] = Color::Light(BaseColor::Black);
 
         t

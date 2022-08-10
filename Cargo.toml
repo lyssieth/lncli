@@ -10,7 +10,7 @@ readme = "README.md"
 
 [dependencies]
 color-eyre = "0.6.2"
-cursive = { version = "0.18.0", features = [
+cursive = { version = "0.19.0", features = [
     "crossterm-backend",
     "markdown",
     "toml",
@@ -22,8 +22,8 @@ open = "3.0.2"
 owo-colors = "3.4.0"
 parking_lot = { version = "0.12.1", features = ["arc_lock"] }
 regex = "1.6.0"
-serde = { version = "1.0.140", features = ["derive"] }
-serde_json = "1.0.82"
+serde = { version = "1.0.143", features = ["derive"] }
+serde_json = "1.0.83"
 ureq = "2.5.0"
 url = "2.2.2"
-visdom = "0.5.2"
+visdom = "0.5.4"
