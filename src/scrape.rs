@@ -46,7 +46,7 @@ pub fn search(input: &str) -> Res<Search> {
 
         let url = format!("https://freewebnovel.com{}", url.to_string());
 
-        results.push((Url::parse(&url).unwrap(), title.to_owned()));
+        results.push((Url::parse(&url).unwrap(), title.clone()));
     }
 
     Ok(Search {
@@ -78,7 +78,7 @@ pub fn get_name(url: &str) -> Res<String> {
 
     let title = dom.find("h1.tit").first();
 
-    Ok(title.text().to_owned())
+    Ok(title.text())
 }
 
 pub fn load(url: &str) -> Res<Output> {
@@ -145,14 +145,11 @@ pub fn load(url: &str) -> Res<Output> {
         let html = res.into_string()?;
         let dom = Vis::load(html).map_err(|e| eyre!("{}", e.green()))?;
 
-        let name = dom
-            .find("#main1 > div > div > div.top > h1 > a")
-            .text()
-            .to_owned();
+        let name = dom.find("#main1 > div > div > div.top > h1 > a").text();
         info!("Found title: {}", name.green());
         let chapter_title = {
             let el = dom.find("#main1 > div > div > div.top > span");
-            let chapter_title = el.text().to_owned();
+            let chapter_title = el.text();
 
             chapter_title
                 .clone()

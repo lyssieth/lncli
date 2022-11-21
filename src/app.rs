@@ -602,16 +602,16 @@ fn update_check(cursive: &mut Cursive) {
     for x in data.tracked() {
         let check = scrape::update_check(&x.url, x.last_chapter);
 
-        if let Ok(check) = check {
-            if check {
-                found.push(x.clone());
-            }
-        } else {
-            error_panel(
-                cursive,
-                &format!("Failed to check for updates: {}", check.unwrap_err()),
-            );
-        }
+        check.map_or_else(
+            |ch| {
+                error_panel(cursive, &format!("Failed to check for updates: {}", ch));
+            },
+            |check| {
+                if check {
+                    found.push(x.clone());
+                }
+            },
+        );
     }
 
     home_view(cursive, &Some(found));
