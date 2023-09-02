@@ -81,9 +81,9 @@ pub fn run() -> Res<()> {
 fn reader_view(siv: &mut Cursive) {
     info!("reader view");
 
-    let state = siv.take_user_data();
+    let state: Option<State> = siv.take_user_data();
 
-    if state.is_none() {
+    let Some(state) = state else {
         siv.pop_layer();
         home_view(siv, &None);
         error_panel(
@@ -91,9 +91,8 @@ fn reader_view(siv: &mut Cursive) {
             "Nothing is configured to be read. Please use `s`, or select from the home screen.",
         );
         return;
-    }
+    };
 
-    let state: State = state.unwrap();
     {
         let state = state.clone();
         siv.set_user_data(state);
@@ -173,9 +172,13 @@ fn reader_view(siv: &mut Cursive) {
         .on_event('O', move |siv| {
             let res = open::that(&state.url);
 
-            if res.is_err() {
+            let Err(e) = res else {
+                return;
+            };
+
+            {
                 error_panel(siv, "Could not open the url.");
-                error!("Could not open the url: {}", res.err().unwrap());
+                error!("Could not open the url: {e}");
             }
         });
 
@@ -205,19 +208,17 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
 
             let chapter = text.parse::<usize>();
 
-            if chapter.is_err() {
-                s.pop_layer();
-                error_panel(
-                    s,
-                    &format!(
-                        "please enter a valid number ({})", // TODO: Nicer error messages
-                        chapter.unwrap_err()
-                    ),
-                );
-                return;
-            }
-
-            let chapter = chapter.unwrap();
+            let chapter = match chapter {
+                Ok(chapter) => chapter,
+                Err(e) => {
+                    s.pop_layer();
+                    error_panel(
+                        s,
+                        &format!("please enter a valid number ({e})",), // TODO: Nicer error messages
+                    );
+                    return;
+                }
+            };
 
             if !range.contains(&chapter) {
                 s.pop_layer();
@@ -228,7 +229,7 @@ fn select_chapter(siv: &mut Cursive, state: &State) {
             let pat = format!("chapter-{}", state.chapter);
             let url = state
                 .url
-                .replace(pat.as_str(), &format!("chapter-{}", chapter));
+                .replace(pat.as_str(), &format!("chapter-{chapter}"));
 
             load_url(s, &url);
 
@@ -343,16 +344,17 @@ fn home_view(siv: &mut Cursive, updates: &Option<Vec<LN>>) {
     let mut data = Data::load();
 
     if data.is_err() {
+        let err = data.expect_err("guaranteed to be an error");
         error_panel(siv, "Data missing/corrupted. Regenerating");
         let res = Data::new().save();
 
         assert!(res.is_ok(), "Failed to generate data. Please check that {:?} is accessible by your user. Error was: {}",
-                Data::data_folder().yellow(), res.unwrap_err().yellow());
+                Data::data_folder().yellow(), err.yellow());
 
         data = Data::load();
     }
 
-    let data = data.unwrap();
+    let data = data.expect("99.99% guaranteed to succeed here");
 
     let mut main_view = LinearLayout::vertical();
 
@@ -453,7 +455,7 @@ fn create_rv(data: &Data, submit: fn(&mut Cursive, &LN)) -> OnEventView<NamedVie
         );
         s.append_plain(" (");
         s.append_styled(
-            format!("{}", last_chapter),
+            format!("{last_chapter}"),
             Style::merge(&[Color::Dark(BaseColor::Magenta).into(), Effect::Bold.into()]),
         );
         s.append_plain(")");
@@ -463,7 +465,7 @@ fn create_rv(data: &Data, submit: fn(&mut Cursive, &LN)) -> OnEventView<NamedVie
 
     let rv = {
         let mut sv = SelectView::new();
-        for x in data.recent().iter() {
+        for x in data.recent() {
             sv.add_item(label(&x.name, x.last_chapter), x.clone());
         }
 
@@ -481,7 +483,7 @@ fn create_rv(data: &Data, submit: fn(&mut Cursive, &LN)) -> OnEventView<NamedVie
         if rv.is_none() {
             return;
         }
-        let rv = rv.unwrap();
+        let rv = rv.expect("Failed to find recent view");
 
         let selected = rv.selected_id();
 
@@ -489,13 +491,13 @@ fn create_rv(data: &Data, submit: fn(&mut Cursive, &LN)) -> OnEventView<NamedVie
             return;
         }
 
-        let selected = selected.unwrap();
-        let item = rv.get_item(selected).unwrap();
+        let selected = selected.expect("Failed to get selected item");
+        let item = rv.get_item(selected).expect("Failed to get selected item");
 
         data.add_tracked(item.1.clone());
 
         if let Err(e) = data.save() {
-            error_panel(s, &format!("Failed to save data: {}", e));
+            error_panel(s, &format!("Failed to save data: {e}"));
             error!("Failed to save data: {}", e);
         }
 
@@ -525,7 +527,7 @@ fn create_tv(
         );
         s.append_plain(" (");
         s.append_styled(
-            format!("{}", last_chapter),
+            format!("{last_chapter}"),
             Style::merge(&[Color::Dark(BaseColor::Magenta).into(), Effect::Bold.into()]),
         );
         s.append_plain(")");
@@ -563,7 +565,7 @@ fn create_tv(
         if sv.is_none() {
             return;
         }
-        let sv = sv.unwrap();
+        let sv = sv.expect("Failed to get select view");
 
         let selected = sv.selected_id();
 
@@ -571,13 +573,15 @@ fn create_tv(
             return;
         }
 
-        let selected = selected.unwrap();
-        let item = sv.get_item(selected).unwrap();
+        let selected = selected.expect("Failed to get selected item");
+        let item = sv
+            .get_item(selected)
+            .expect("Failed to get selected item from SelectView");
 
         data.tracked_mut().retain(|x| x != item.1);
 
         if let Err(e) = data.save() {
-            error_panel(s, &format!("Failed to save data: {}", e));
+            error_panel(s, &format!("Failed to save data: {e}"));
             error!("Failed to save data: {}", e);
         }
 
@@ -595,7 +599,7 @@ fn update_check(cursive: &mut Cursive) {
         return;
     }
 
-    let data = data.unwrap();
+    let data = data.expect("Failed to load data");
 
     let mut found = Vec::new();
 
@@ -604,7 +608,7 @@ fn update_check(cursive: &mut Cursive) {
 
         check.map_or_else(
             |ch| {
-                error_panel(cursive, &format!("Failed to check for updates: {}", ch));
+                error_panel(cursive, &format!("Failed to check for updates: {ch}"));
             },
             |check| {
                 if check {
@@ -626,7 +630,7 @@ fn load_url(siv: &mut Cursive, url: &str) {
         panic!("{}", e);
     }
 
-    let output = output.unwrap();
+    let output = output.expect("Failed to get output");
 
     let state = State::from_output(url, output.clone());
 
@@ -644,14 +648,15 @@ fn load_url(siv: &mut Cursive, url: &str) {
             panic!("{}", e);
         }
     } else {
-        data.unwrap()
+        data.expect("Failed to load data")
     };
 
     data.recent_mut().push_front(LN {
         name: output.name.clone(),
         url: {
             // ugly ass hack
-            let mut a = url.split_once("/chapter").unwrap().0.to_string();
+            let a = url.split_once("/chapter").expect("Failed to split url");
+            let mut a = a.0.to_string();
             a.push_str(".html");
 
             a
@@ -659,7 +664,12 @@ fn load_url(siv: &mut Cursive, url: &str) {
         last_chapter: output.chapter,
     });
 
-    let test_url = url.split_at(url.find("chapter-").unwrap()).0;
+    let test_url = url
+        .split_at(
+            url.find("chapter-")
+                .expect("Failed to find 'chapter-' in url"),
+        )
+        .0;
     let test_url = test_url[0..test_url.len() - 1].to_owned();
     let test_url = test_url + ".html";
 
@@ -719,7 +729,9 @@ fn search_view(siv: &mut Cursive, results: Option<Search>) {
         let mut layout = LinearLayout::vertical();
 
         if let Some(search_results) = search_results {
-            let query = results.unwrap().query;
+            let query = results
+                .expect("Failed to get query from search results")
+                .query;
             let query = query.trim();
 
             layout.add_child(
@@ -826,12 +838,14 @@ fn create_sv(search: &Search) -> cursive::views::OnEventView<cursive::views::Sel
     });
 
     OnEventView::new(sv).on_event('t', move |s| {
-        let selected = selected.read_arc();
-        if selected.is_none() {
-            info!("Selected was none");
-            return;
-        }
-        let sel = selected.clone().unwrap();
+        let sel = {
+            let selected = selected.clone().read_arc();
+            if selected.is_none() {
+                info!("Selected was none");
+                return;
+            }
+            selected.clone().expect("No selected value found")
+        };
 
         info!("Selected: {}", sel.green());
 
@@ -839,7 +853,7 @@ fn create_sv(search: &Search) -> cursive::views::OnEventView<cursive::views::Sel
 
         if let Ok(mut data) = data {
             data.add_tracked(LN {
-                name: scrape::get_name(&sel).unwrap(),
+                name: scrape::get_name(&sel).expect("Failed to get name from selection"),
                 url: sel.clone(),
                 last_chapter: 1,
             });
@@ -865,7 +879,7 @@ fn search_url(siv: &mut Cursive, query: &str) {
         return;
     }
 
-    let output = output.unwrap();
+    let output = output.expect("Failed to get search results");
 
     search_view(siv, Some(output));
 }

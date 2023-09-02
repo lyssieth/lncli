@@ -54,7 +54,10 @@ impl Data {
     pub fn save(&self) -> Res<()> {
         let path = Self::data_folder().join("data.json");
 
-        std::fs::create_dir_all(path.parent().unwrap())?;
+        std::fs::create_dir_all(
+            path.parent()
+                .expect("Could not get parent directory of path."),
+        )?;
 
         let mut data = self.clone();
 
@@ -75,7 +78,10 @@ impl Data {
             .fold(VecDeque::new(), |mut acc: VecDeque<LN>, x| {
                 if acc.iter().any(|v| v.name == x.name) {
                     // get the item and compare the last chapter
-                    let item = acc.iter_mut().find(|v| v.name == x.name).unwrap();
+                    let item = acc
+                        .iter_mut()
+                        .find(|v| v.name == x.name)
+                        .expect("Could not find item in `acc` with matching name");
 
                     if item.last_chapter < x.last_chapter {
                         *item = x;

@@ -4,8 +4,8 @@ use color_eyre::eyre::{bail, eyre};
 use log::info;
 use owo_colors::OwoColorize;
 use regex::Regex;
+use reqwest::blocking::Client;
 use std::fmt::Write;
-use ureq::Agent;
 use url::Url;
 use visdom::Vis;
 
@@ -14,19 +14,15 @@ use crate::Res;
 const SEARCH_URL: &str = "https://freewebnovel.com/search/";
 
 pub fn search(input: &str) -> Res<Search> {
-    let agent = Agent::new();
+    let client = Client::new();
 
-    let res = agent.post(SEARCH_URL).send_form(&[("searchkey", input)])?;
+    let res = client
+        .post(SEARCH_URL)
+        .form(&[("searchkey", input)])
+        .send()?
+        .error_for_status()?;
 
-    if res.status() != 200 {
-        bail!(
-            "got status code {}: {}", // TODO: Nicer error messages
-            res.status().yellow(),
-            res.status_text().green()
-        );
-    }
-
-    let dom = Vis::load(res.into_string()?).map_err(|e| eyre!("{}", e.green()))?;
+    let dom = Vis::load(res.text()?).map_err(|e| eyre!("{}", e.green()))?;
 
     let elements = dom.find("div.li-row");
 
@@ -42,11 +38,16 @@ pub fn search(input: &str) -> Res<Search> {
             bail!("found no results"); // TODO: Nicer error messages
         }
 
-        let url = url.unwrap();
+        let Some(url) = url else {
+            bail!("found no results"); // TODO: Nicer error messages
+        };
 
         let url = format!("https://freewebnovel.com{}", url.to_string());
 
-        results.push((Url::parse(&url).unwrap(), title.clone()));
+        results.push((
+            Url::parse(&url).expect("Failed to parse URL"),
+            title.clone(),
+        ));
     }
 
     Ok(Search {
@@ -62,19 +63,11 @@ pub struct Search {
 }
 
 pub fn get_name(url: &str) -> Res<String> {
-    let agent = Agent::new();
+    let client = Client::new();
 
-    let res = agent.get(url).call()?;
+    let res = client.get(url).send()?.error_for_status()?;
 
-    if res.status() != 200 {
-        bail!(
-            "got status code {}: {}", // TODO: Nicer error messages
-            res.status().yellow(),
-            res.status_text().green()
-        );
-    }
-
-    let dom = Vis::load(res.into_string()?).map_err(|e| eyre!("{}", e.green()))?;
+    let dom = Vis::load(res.text()?).map_err(|e| eyre!("{}", e.green()))?;
 
     let title = dom.find("h1.tit").first();
 
@@ -86,13 +79,19 @@ pub fn load(url: &str) -> Res<Output> {
         bail!("invalid url: {}", url.green()); // TODO: Nicer error messages
     }
 
-    let chapter_regex = Regex::new(r"chapter-(\d+)\.html").unwrap();
+    let chapter_regex = Regex::new(r"chapter-(\d+)\.html").expect("Failed to create regex");
 
-    let agent = Agent::new();
+    let client = Client::new();
 
     let (main_url, chapter) = {
-        let split = url.split_once("/chapter-").unwrap();
-        let chapter = split.1.split_once(".html").unwrap().0;
+        let split = url
+            .split_once("/chapter-")
+            .expect("Failed to split URL at /chapter-");
+        let chapter = split
+            .1
+            .split_once(".html")
+            .expect("Failed to split chapter number")
+            .0;
         let chapter = chapter.parse::<usize>()?;
 
         let mut main_url = split.0.to_owned();
@@ -103,24 +102,19 @@ pub fn load(url: &str) -> Res<Output> {
     info!("Found main url: {}", main_url.green());
 
     let max_chapters = {
-        let res = agent.get(&main_url).call()?;
+        let res = client.get(&main_url).send()?.error_for_status()?;
 
-        if res.status() != 200 {
-            bail!(
-                "got status code {}: {}", // TODO: Nicer error messages
-                res.status().yellow(),
-                res.status_text().green()
-            );
-        }
+        let dom = Vis::load(res.text()?).map_err(|e| eyre!("{}", e.green()))?;
 
-        let dom = Vis::load(res.into_string()?).map_err(|e| eyre!("{}", e.green()))?;
-
-        let item = dom.find("body > div.main > div > div > div.col-content > div.m-newest1 > ul > li:nth-child(1) > a").attr("href").unwrap().to_string();
+        let item = dom.find("body > div.main > div > div > div.col-content > div.m-newest1 > ul > li:nth-child(1) > a").attr("href").expect("Failed to get href").to_string();
 
         let max_chapters = chapter_regex.captures(&item);
 
         let max_chapters = if let Some(max_chapters) = max_chapters {
-            max_chapters.get(1).unwrap().as_str()
+            max_chapters
+                .get(1)
+                .expect("Failed to get max chapters")
+                .as_str()
         } else {
             bail!("could not find max chapters, regex failed"); // TODO: Nicer error messages
         };
@@ -132,17 +126,9 @@ pub fn load(url: &str) -> Res<Output> {
     info!("Found max chapters: {}", max_chapters.yellow());
 
     let (name, chapter_title, content) = {
-        let res = agent.get(url).call()?;
+        let res = client.get(url).send()?.error_for_status()?;
 
-        if res.status() != 200 {
-            bail!(
-                "got status code {}: {}", // TODO: Nicer error messages
-                res.status().yellow(),
-                res.status_text().green()
-            );
-        }
-
-        let html = res.into_string()?;
+        let html = res.text()?;
         let dom = Vis::load(html).map_err(|e| eyre!("{}", e.green()))?;
 
         let name = dom.find("#main1 > div > div > div.top > h1 > a").text();
@@ -167,7 +153,7 @@ pub fn load(url: &str) -> Res<Output> {
                 let text = x.text_content();
 
                 if !text.trim().is_empty() {
-                    write!(&mut content, "{}\n\n", text);
+                    write!(&mut content, "{text}\n\n");
                 }
             }
 
@@ -191,31 +177,26 @@ pub fn update_check(url: &str, last_chapter: usize) -> Res<bool> {
         bail!("invalid url: {}", url.green()); // TODO: Nicer error messages
     }
 
-    let chapter_regex = Regex::new(r"chapter-(\d+)\.html").unwrap();
+    let chapter_regex = Regex::new(r"chapter-(\d+)\.html").expect("Failed to create regex");
 
-    let agent = Agent::new();
+    let client = Client::new();
 
-    let res = agent.get(url).call()?;
+    let res = client.get(url).send()?.error_for_status()?;
 
-    if res.status() != 200 {
-        bail!(
-            "got status code {}: {}", // TODO: Nicer error messages
-            res.status().yellow(),
-            res.status_text().green()
-        );
-    }
-
-    let html = res.into_string()?;
+    let html = res.text()?;
 
     let dom = Vis::load(html).map_err(|e| eyre!("{}", e.green()))?;
 
     let max_chapters = {
-        let item = dom.find("body > div.main > div > div > div.col-content > div.m-newest1 > ul > li:nth-child(1) > a").attr("href").unwrap().to_string();
+        let item = dom.find("body > div.main > div > div > div.col-content > div.m-newest1 > ul > li:nth-child(1) > a").attr("href").expect("Failed to get href attribute").to_string();
 
         let max_chapters = chapter_regex.captures(&item);
 
         let max_chapters = if let Some(max_chapters) = max_chapters {
-            max_chapters.get(1).unwrap().as_str()
+            max_chapters
+                .get(1)
+                .expect("Failed to get max chapters")
+                .as_str()
         } else {
             bail!("could not find max chapters, regex failed"); // TODO: Nicer error messages
         };
